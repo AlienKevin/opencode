@@ -4,7 +4,7 @@ import { Catalog } from "@opencode-ai/core/catalog"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { AzureCognitiveServicesPlugin } from "@opencode-ai/core/plugin/provider/azure"
 import { ProviderV2 } from "@opencode-ai/core/provider"
-import { fakeSelectorSdk, it, model, provider, withEnv } from "./provider-helper"
+import { addPlugin, fakeSelectorSdk, it, model, provider, withEnv } from "./provider-helper"
 
 describe("AzureCognitiveServicesPlugin", () => {
   it.effect("maps the resource env var to the Azure SDK baseURL", () =>
@@ -12,7 +12,7 @@ describe("AzureCognitiveServicesPlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(AzureCognitiveServicesPlugin)
+        yield* addPlugin(plugin, AzureCognitiveServicesPlugin)
         yield* catalog.transform((catalog) => {
           catalog.provider.update(ProviderV2.ID.make("azure-cognitive-services"), (item) => {
             item.api = { type: "aisdk", package: "@ai-sdk/openai-compatible" }
@@ -35,7 +35,7 @@ describe("AzureCognitiveServicesPlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(AzureCognitiveServicesPlugin)
+        yield* addPlugin(plugin, AzureCognitiveServicesPlugin)
         yield* catalog.transform((catalog) => {
           const azure = provider("azure-cognitive-services", {
             api: { type: "aisdk", package: "@ai-sdk/openai-compatible" },
@@ -62,7 +62,7 @@ describe("AzureCognitiveServicesPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: string[] = []
-      yield* plugin.add(AzureCognitiveServicesPlugin)
+      yield* addPlugin(plugin, AzureCognitiveServicesPlugin)
       yield* plugin.trigger(
         "aisdk.language",
         {
@@ -80,7 +80,7 @@ describe("AzureCognitiveServicesPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: string[] = []
-      yield* plugin.add(AzureCognitiveServicesPlugin)
+      yield* addPlugin(plugin, AzureCognitiveServicesPlugin)
       yield* plugin.trigger(
         "aisdk.language",
         { model: model("azure-cognitive-services", "deployment"), sdk: fakeSelectorSdk(calls), options: {} },
@@ -101,7 +101,7 @@ describe("AzureCognitiveServicesPlugin", () => {
       const plugin = yield* PluginV2.Service
       const calls: string[] = []
       const sdk = fakeSelectorSdk(calls)
-      yield* plugin.add(AzureCognitiveServicesPlugin)
+      yield* addPlugin(plugin, AzureCognitiveServicesPlugin)
       yield* plugin.trigger(
         "aisdk.language",
         {

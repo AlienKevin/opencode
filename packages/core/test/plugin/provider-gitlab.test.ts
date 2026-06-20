@@ -12,7 +12,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { location } from "../fixture/location"
 import { testEffect } from "../lib/effect"
-import { it, model, npmLayer, withEnv } from "./provider-helper"
+import { addPlugin, it, model, npmLayer, withEnv } from "./provider-helper"
 
 const gitlabSDKOptions: Record<string, unknown>[] = []
 const database = Database.layerFromPath(":memory:").pipe(Layer.fresh)
@@ -57,7 +57,7 @@ describe("GitLabPlugin", () => {
         Effect.gen(function* () {
           gitlabSDKOptions.length = 0
           const plugin = yield* PluginV2.Service
-          yield* plugin.add(GitLabPlugin)
+          yield* addPlugin(plugin, GitLabPlugin)
           yield* plugin.trigger(
             "aisdk.sdk",
             { model: model("gitlab", "claude"), package: "gitlab-ai-provider", options: { name: "gitlab" } },
@@ -90,7 +90,7 @@ describe("GitLabPlugin", () => {
         Effect.gen(function* () {
           gitlabSDKOptions.length = 0
           const plugin = yield* PluginV2.Service
-          yield* plugin.add(GitLabPlugin)
+          yield* addPlugin(plugin, GitLabPlugin)
           yield* plugin.trigger(
             "aisdk.sdk",
             { model: model("gitlab", "claude"), package: "gitlab-ai-provider", options: { name: "gitlab" } },
@@ -111,7 +111,7 @@ describe("GitLabPlugin", () => {
         Effect.gen(function* () {
           gitlabSDKOptions.length = 0
           const plugin = yield* PluginV2.Service
-          yield* plugin.add(GitLabPlugin)
+          yield* addPlugin(plugin, GitLabPlugin)
           yield* plugin.trigger(
             "aisdk.sdk",
             {
@@ -152,7 +152,7 @@ describe("GitLabPlugin", () => {
     Effect.gen(function* () {
       gitlabSDKOptions.length = 0
       const plugin = yield* PluginV2.Service
-      yield* plugin.add(GitLabPlugin)
+      yield* addPlugin(plugin, GitLabPlugin)
       const result = yield* plugin.trigger(
         "aisdk.sdk",
         { model: model("gitlab", "claude"), package: "@ai-sdk/openai", options: { name: "gitlab" } },
@@ -178,7 +178,7 @@ describe("GitLabPlugin", () => {
             integrationID: Integration.ID.make("gitlab"),
             value: new Credential.Key({ type: "key", key: "account-token" }),
           })
-          yield* plugin.add(GitLabPlugin)
+          yield* addPlugin(plugin, GitLabPlugin)
           yield* catalog.transform((catalog) => catalog.provider.update(ProviderV2.ID.make("gitlab"), () => {}))
           const provider = yield* catalog.provider.get(ProviderV2.ID.make("gitlab"))
           yield* plugin.trigger(
@@ -216,7 +216,7 @@ describe("GitLabPlugin", () => {
               expires: 9999999999999,
             }),
           })
-          yield* plugin.add(GitLabPlugin)
+          yield* addPlugin(plugin, GitLabPlugin)
           yield* catalog.transform((catalog) => catalog.provider.update(ProviderV2.ID.make("gitlab"), () => {}))
           const provider = yield* catalog.provider.get(ProviderV2.ID.make("gitlab"))
           yield* plugin.trigger(
@@ -237,7 +237,7 @@ describe("GitLabPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: [string, unknown][] = []
-      yield* plugin.add(GitLabPlugin)
+      yield* addPlugin(plugin, GitLabPlugin)
       const result = yield* plugin.trigger(
         "aisdk.language",
         {
@@ -273,7 +273,7 @@ describe("GitLabPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: [string, unknown][] = []
-      yield* plugin.add(GitLabPlugin)
+      yield* addPlugin(plugin, GitLabPlugin)
       const result = yield* plugin.trigger(
         "aisdk.language",
         {
@@ -300,7 +300,7 @@ describe("GitLabPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: [string, unknown][] = []
-      yield* plugin.add(GitLabPlugin)
+      yield* addPlugin(plugin, GitLabPlugin)
       yield* plugin.trigger(
         "aisdk.language",
         {
@@ -329,7 +329,7 @@ describe("GitLabPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: [string, unknown][] = []
-      yield* plugin.add(GitLabPlugin)
+      yield* addPlugin(plugin, GitLabPlugin)
       yield* plugin.trigger(
         "aisdk.language",
         {

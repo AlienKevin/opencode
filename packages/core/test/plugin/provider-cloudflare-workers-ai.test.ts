@@ -13,7 +13,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { location } from "../fixture/location"
 import { testEffect } from "../lib/effect"
-import { fakeSelectorSdk, it, model, npmLayer, withEnv } from "./provider-helper"
+import { addPlugin, fakeSelectorSdk, it, model, npmLayer, withEnv } from "./provider-helper"
 
 const database = Database.layerFromPath(":memory:").pipe(Layer.fresh)
 const preferences = Credential.layer.pipe(Layer.provide(database))
@@ -57,7 +57,7 @@ describe("CloudflareWorkersAIPlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(CloudflareWorkersAIPlugin)
+        yield* addPlugin(plugin, CloudflareWorkersAIPlugin)
         yield* catalog.transform((catalog) =>
           catalog.provider.update(ProviderV2.ID.make("cloudflare-workers-ai"), (provider) => {
             provider.api = { type: "aisdk", package: "test-provider" }
@@ -88,7 +88,7 @@ describe("CloudflareWorkersAIPlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(CloudflareWorkersAIPlugin)
+        yield* addPlugin(plugin, CloudflareWorkersAIPlugin)
         yield* catalog.transform((catalog) =>
           catalog.provider.update(ProviderV2.ID.make("cloudflare-workers-ai"), (provider) => {
             provider.api = { type: "aisdk", package: "test-provider", url: "https://proxy.example/v1" }
@@ -107,7 +107,7 @@ describe("CloudflareWorkersAIPlugin", () => {
     withEnv({ CLOUDFLARE_ACCOUNT_ID: undefined, CLOUDFLARE_API_KEY: "key" }, () =>
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
-        yield* plugin.add(CloudflareWorkersAIPlugin)
+        yield* addPlugin(plugin, CloudflareWorkersAIPlugin)
         const result = yield* plugin.trigger(
           "aisdk.sdk",
           {
@@ -143,7 +143,7 @@ describe("CloudflareWorkersAIPlugin", () => {
               metadata: { accountId: "account-acct" },
             }),
           })
-          yield* plugin.add(CloudflareWorkersAIPlugin)
+          yield* addPlugin(plugin, CloudflareWorkersAIPlugin)
           yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("cloudflare-workers-ai"), (provider) => {
               provider.api = { type: "aisdk", package: "test-provider" }
@@ -164,7 +164,7 @@ describe("CloudflareWorkersAIPlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(CloudflareWorkersAIPlugin)
+        yield* addPlugin(plugin, CloudflareWorkersAIPlugin)
         yield* catalog.transform((catalog) =>
           catalog.provider.update(ProviderV2.ID.make("cloudflare-workers-ai"), (provider) => {
             provider.api = { type: "aisdk", package: "test-provider" }
@@ -184,7 +184,7 @@ describe("CloudflareWorkersAIPlugin", () => {
     withEnv({ CLOUDFLARE_ACCOUNT_ID: "acct", CLOUDFLARE_API_KEY: "env-key" }, () =>
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
-        yield* plugin.add(CloudflareWorkersAIPlugin)
+        yield* addPlugin(plugin, CloudflareWorkersAIPlugin)
         const result = yield* plugin.trigger(
           "aisdk.sdk",
           {
@@ -213,7 +213,7 @@ describe("CloudflareWorkersAIPlugin", () => {
     withEnv({ CLOUDFLARE_ACCOUNT_ID: "acct", CLOUDFLARE_API_KEY: "key" }, () =>
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
-        yield* plugin.add(CloudflareWorkersAIPlugin)
+        yield* addPlugin(plugin, CloudflareWorkersAIPlugin)
         const result = yield* plugin.trigger(
           "aisdk.sdk",
           {
@@ -243,7 +243,7 @@ describe("CloudflareWorkersAIPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: string[] = []
-      yield* plugin.add(CloudflareWorkersAIPlugin)
+      yield* addPlugin(plugin, CloudflareWorkersAIPlugin)
       const result = yield* plugin.trigger(
         "aisdk.language",
         {
@@ -262,7 +262,7 @@ describe("CloudflareWorkersAIPlugin", () => {
     withEnv({ CLOUDFLARE_ACCOUNT_ID: "acct", CLOUDFLARE_API_KEY: "key" }, () =>
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
-        yield* plugin.add(CloudflareWorkersAIPlugin)
+        yield* addPlugin(plugin, CloudflareWorkersAIPlugin)
         const result = yield* plugin.trigger(
           "aisdk.sdk",
           {

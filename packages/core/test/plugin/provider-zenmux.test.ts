@@ -5,7 +5,7 @@ import { PluginV2 } from "@opencode-ai/core/plugin"
 import { ProviderPlugins } from "@opencode-ai/core/plugin/provider"
 import { ZenmuxPlugin } from "@opencode-ai/core/plugin/provider/zenmux"
 import { ProviderV2 } from "@opencode-ai/core/provider"
-import { expectPluginRegistered, it, provider } from "./provider-helper"
+import { addPlugin, expectPluginRegistered, it, provider } from "./provider-helper"
 
 describe("ZenmuxPlugin", () => {
   it.effect("is registered so legacy referer headers can be applied", () =>
@@ -21,7 +21,7 @@ describe("ZenmuxPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(ZenmuxPlugin)
+      yield* addPlugin(plugin, ZenmuxPlugin)
       yield* catalog.transform((catalog) => {
         const item = provider("zenmux", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://zenmux.ai/api/v1" },
@@ -40,7 +40,7 @@ describe("ZenmuxPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(ZenmuxPlugin)
+      yield* addPlugin(plugin, ZenmuxPlugin)
       yield* catalog.transform((catalog) => {
         const item = provider("zenmux", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://zenmux.ai/api/v1" },
@@ -64,7 +64,7 @@ describe("ZenmuxPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(ZenmuxPlugin)
+      yield* addPlugin(plugin, ZenmuxPlugin)
       yield* catalog.transform((catalog) => {
         const item = provider("zenmux", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://zenmux.ai/api/v1" },
@@ -90,7 +90,7 @@ describe("ZenmuxPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(ZenmuxPlugin)
+      yield* addPlugin(plugin, ZenmuxPlugin)
       yield* catalog.transform((catalog) => {
         const item = provider("openrouter", {
           request: {

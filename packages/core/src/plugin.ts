@@ -68,7 +68,12 @@ export type Host = PluginHost
 type Executable<R = never> = Effect.Effect<HookFunctions | void, never, R | Scope.Scope>
 export type Effect<R = never> = Executable<R> | ((host: Host) => Executable<R>)
 
-export function define<const E extends Effect<any>>(input: { id: ID; effect: E }) {
+export function define<R>(input: { id: ID; effect: (host: Host) => Executable<R> }): {
+  id: ID
+  effect: (host: Host) => Executable<R>
+}
+export function define<R>(input: { id: ID; effect: Executable<R> }): { id: ID; effect: Executable<R> }
+export function define(input: { id: ID; effect: Effect<any> }) {
   return input
 }
 

@@ -4,7 +4,7 @@ import { Catalog } from "@opencode-ai/core/catalog"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { CerebrasPlugin } from "@opencode-ai/core/plugin/provider/cerebras"
 import { ProviderV2 } from "@opencode-ai/core/provider"
-import { it, model } from "./provider-helper"
+import { addPlugin, it, model } from "./provider-helper"
 
 const cerebrasOptions: Record<string, unknown>[] = []
 
@@ -23,7 +23,7 @@ describe("CerebrasPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(CerebrasPlugin)
+      yield* addPlugin(plugin, CerebrasPlugin)
       yield* catalog.transform((catalog) => {
         catalog.provider.update(ProviderV2.ID.make("cerebras"), (item) => {
           item.api = { type: "aisdk", package: "@ai-sdk/cerebras" }
@@ -41,7 +41,7 @@ describe("CerebrasPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(CerebrasPlugin)
+      yield* addPlugin(plugin, CerebrasPlugin)
       yield* catalog.transform((catalog) => catalog.provider.update(ProviderV2.ID.make("groq"), () => {}))
       expect((yield* catalog.provider.get(ProviderV2.ID.make("groq"))).request.headers).toEqual({})
     }),
@@ -51,7 +51,7 @@ describe("CerebrasPlugin", () => {
     Effect.gen(function* () {
       cerebrasOptions.length = 0
       const plugin = yield* PluginV2.Service
-      yield* plugin.add(CerebrasPlugin)
+      yield* addPlugin(plugin, CerebrasPlugin)
       const result = yield* plugin.trigger(
         "aisdk.sdk",
         {
@@ -70,7 +70,7 @@ describe("CerebrasPlugin", () => {
     Effect.gen(function* () {
       cerebrasOptions.length = 0
       const plugin = yield* PluginV2.Service
-      yield* plugin.add(CerebrasPlugin)
+      yield* addPlugin(plugin, CerebrasPlugin)
       yield* plugin.trigger(
         "aisdk.sdk",
         {
@@ -88,7 +88,7 @@ describe("CerebrasPlugin", () => {
     Effect.gen(function* () {
       cerebrasOptions.length = 0
       const plugin = yield* PluginV2.Service
-      yield* plugin.add(CerebrasPlugin)
+      yield* addPlugin(plugin, CerebrasPlugin)
       const result = yield* plugin.trigger(
         "aisdk.sdk",
         {

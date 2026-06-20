@@ -5,7 +5,7 @@ import { PluginV2 } from "@opencode-ai/core/plugin"
 import { ProviderPlugins } from "@opencode-ai/core/plugin/provider"
 import { NvidiaPlugin } from "@opencode-ai/core/plugin/provider/nvidia"
 import { ProviderV2 } from "@opencode-ai/core/provider"
-import { expectPluginRegistered, it, provider } from "./provider-helper"
+import { addPlugin, expectPluginRegistered, it, provider } from "./provider-helper"
 
 describe("NvidiaPlugin", () => {
   it.effect("is registered so legacy referer headers can be applied", () =>
@@ -21,7 +21,7 @@ describe("NvidiaPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(NvidiaPlugin)
+      yield* addPlugin(plugin, NvidiaPlugin)
       yield* catalog.transform((catalog) => {
         const nvidia = provider("nvidia", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://integrate.api.nvidia.com/v1" },
@@ -47,7 +47,7 @@ describe("NvidiaPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(NvidiaPlugin)
+      yield* addPlugin(plugin, NvidiaPlugin)
       yield* catalog.transform((catalog) => {
         const item = provider("nvidia", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://integrate.api.nvidia.com/v1" },
@@ -71,7 +71,7 @@ describe("NvidiaPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(NvidiaPlugin)
+      yield* addPlugin(plugin, NvidiaPlugin)
       yield* catalog.transform((catalog) => {
         const item = provider("nvidia", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://integrate.api.nvidia.com/v1" },

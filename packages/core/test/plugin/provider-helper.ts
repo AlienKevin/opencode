@@ -13,6 +13,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { location } from "../fixture/location"
 import { testEffect } from "../lib/effect"
+import { catalogHost, host, integrationHost } from "./host"
 
 export const fixtureProvider = new URL("./fixtures/provider-factory.ts", import.meta.url).href
 const locationLayer = Layer.succeed(
@@ -73,6 +74,31 @@ export const it = testEffect(
     Layer.provideMerge(npmLayer),
   ),
 )
+
+export function addPlugin(
+  plugin: PluginV2.Interface,
+  definition: {
+    readonly id: PluginV2.ID
+    readonly effect: PluginV2.Effect
+  },
+) {
+  return Effect.gen(function* () {
+    const catalog = yield* Effect.serviceOption(Catalog.Service)
+    const integration = yield* Effect.serviceOption(Integration.Service)
+    const npm = yield* Effect.serviceOption(Npm.Service)
+    const effect =
+      typeof definition.effect === "function"
+        ? definition.effect(
+            host({
+              ...(Option.isSome(catalog) ? { catalog: catalogHost(catalog.value) } : {}),
+              ...(Option.isSome(integration) ? { integration: integrationHost(integration.value) } : {}),
+              ...(Option.isSome(npm) ? { npm: npm.value } : {}),
+            }),
+          )
+        : definition.effect
+    yield* plugin.add({ id: definition.id, effect })
+  })
+}
 
 type ProviderInput = Partial<Omit<ProviderV2.Info, "api" | "request">> & {
   api?: ProviderV2.Api

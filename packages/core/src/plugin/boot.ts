@@ -369,11 +369,19 @@ function integrationDraft(draft: Integration.Draft): PublicIntegrationDraft {
         draft.method
           .list(Integration.ID.make(id))
           .map((method) => encode<PublicIntegrationMethod>(Integration.Method, method)),
-      update: (input) =>
+      update: (input) => {
+        if (input.method.type === "env") {
+          draft.method.update({
+            integrationID: Integration.ID.make(input.integrationID),
+            method: { type: "env", names: [...input.method.names] },
+          })
+          return
+        }
         draft.method.update({
           integrationID: Integration.ID.make(input.integrationID),
-          method: input.method,
-        }),
+          method: { type: "key", label: input.method.label },
+        })
+      },
       remove: (id, method) =>
         draft.method.remove(Integration.ID.make(id), Schema.decodeUnknownSync(Integration.Method)(method)),
     },

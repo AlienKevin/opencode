@@ -4,7 +4,7 @@ import { Catalog } from "@opencode-ai/core/catalog"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { GoogleVertexPlugin } from "@opencode-ai/core/plugin/provider/google-vertex"
 import { ProviderV2 } from "@opencode-ai/core/provider"
-import { fakeSelectorSdk, it, model, withEnv } from "./provider-helper"
+import { addPlugin, fakeSelectorSdk, it, model, withEnv } from "./provider-helper"
 
 const vertexOptions: Record<string, any>[] = []
 const googleAuthOptions: Record<string, any>[] = []
@@ -39,7 +39,7 @@ describe("GoogleVertexPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(GoogleVertexPlugin)
+      yield* addPlugin(plugin, GoogleVertexPlugin)
       yield* catalog.transform((catalog) =>
         catalog.provider.update(ProviderV2.ID.opencode, (provider) => {
           provider.api = {
@@ -69,7 +69,7 @@ describe("GoogleVertexPlugin", () => {
         Effect.gen(function* () {
           const plugin = yield* PluginV2.Service
           const catalog = yield* Catalog.Service
-          yield* plugin.add(GoogleVertexPlugin)
+          yield* addPlugin(plugin, GoogleVertexPlugin)
           yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
               provider.api = {
@@ -107,7 +107,7 @@ describe("GoogleVertexPlugin", () => {
           vertexOptions.length = 0
           const plugin = yield* PluginV2.Service
           const catalog = yield* Catalog.Service
-          yield* plugin.add(GoogleVertexPlugin)
+          yield* addPlugin(plugin, GoogleVertexPlugin)
           yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
               provider.api = {
@@ -156,7 +156,7 @@ describe("GoogleVertexPlugin", () => {
         Effect.gen(function* () {
           const plugin = yield* PluginV2.Service
           const catalog = yield* Catalog.Service
-          yield* plugin.add(GoogleVertexPlugin)
+          yield* addPlugin(plugin, GoogleVertexPlugin)
           yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
               provider.api = {
@@ -184,7 +184,7 @@ describe("GoogleVertexPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(GoogleVertexPlugin)
+      yield* addPlugin(plugin, GoogleVertexPlugin)
       yield* catalog.transform((catalog) =>
         catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
           provider.api = {
@@ -219,7 +219,7 @@ describe("GoogleVertexPlugin", () => {
         Effect.gen(function* () {
           const plugin = yield* PluginV2.Service
           const catalog = yield* Catalog.Service
-          yield* plugin.add(GoogleVertexPlugin)
+          yield* addPlugin(plugin, GoogleVertexPlugin)
           yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
               provider.api = { type: "aisdk", package: "@ai-sdk/google-vertex" }
@@ -243,7 +243,7 @@ describe("GoogleVertexPlugin", () => {
         Effect.gen(function* () {
           vertexOptions.length = 0
           const plugin = yield* PluginV2.Service
-          yield* plugin.add(GoogleVertexPlugin)
+          yield* addPlugin(plugin, GoogleVertexPlugin)
           yield* plugin.trigger(
             "aisdk.sdk",
             {
@@ -268,7 +268,7 @@ describe("GoogleVertexPlugin", () => {
       googleAuthOptions.length = 0
       const fetchCalls: { input: Parameters<typeof fetch>[0]; init?: RequestInit }[] = []
       const plugin = yield* PluginV2.Service
-      yield* plugin.add(GoogleVertexPlugin)
+      yield* addPlugin(plugin, GoogleVertexPlugin)
       yield* plugin.add({
         id: PluginV2.ID.make("capture-openai-compatible"),
         effect: Effect.succeed({
@@ -322,7 +322,7 @@ describe("GoogleVertexPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: string[] = []
-      yield* plugin.add(GoogleVertexPlugin)
+      yield* addPlugin(plugin, GoogleVertexPlugin)
       yield* plugin.trigger(
         "aisdk.language",
         {

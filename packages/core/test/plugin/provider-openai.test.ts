@@ -7,11 +7,14 @@ import { PluginV2 } from "@opencode-ai/core/plugin"
 import { OpenAIPlugin } from "@opencode-ai/core/plugin/provider/openai"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { fakeSelectorSdk, it, model, provider } from "./provider-helper"
+import { host, integrationHost } from "./host"
 
 function add(plugin: PluginV2.Interface, integrations: Integration.Interface) {
   return plugin.add({
-    ...OpenAIPlugin,
-    effect: OpenAIPlugin.effect.pipe(Effect.provideService(Integration.Service, integrations)),
+    id: OpenAIPlugin.id,
+    effect: OpenAIPlugin.effect(host({ integration: integrationHost(integrations) })).pipe(
+      Effect.provideService(Integration.Service, integrations),
+    ),
   })
 }
 

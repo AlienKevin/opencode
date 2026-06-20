@@ -6,7 +6,7 @@ import { PluginV2 } from "@opencode-ai/core/plugin"
 import { ProviderPlugins } from "@opencode-ai/core/plugin/provider"
 import { OpenRouterPlugin } from "@opencode-ai/core/plugin/provider/openrouter"
 import { ProviderV2 } from "@opencode-ai/core/provider"
-import { expectPluginRegistered, it, model, provider } from "./provider-helper"
+import { addPlugin, expectPluginRegistered, it, model, provider } from "./provider-helper"
 
 describe("OpenRouterPlugin", () => {
   it.effect("is registered so legacy OpenRouter behavior can be applied", () =>
@@ -22,7 +22,7 @@ describe("OpenRouterPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(OpenRouterPlugin)
+      yield* addPlugin(plugin, OpenRouterPlugin)
       yield* catalog.transform((catalog) => {
         const openrouter = provider("openrouter", {
           api: { type: "aisdk", package: "@openrouter/ai-sdk-provider" },
@@ -47,7 +47,7 @@ describe("OpenRouterPlugin", () => {
   it.effect("creates an SDK only for the OpenRouter package", () =>
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
-      yield* plugin.add(OpenRouterPlugin)
+      yield* addPlugin(plugin, OpenRouterPlugin)
 
       const ignored = yield* plugin.trigger(
         "aisdk.sdk",
@@ -73,7 +73,7 @@ describe("OpenRouterPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(OpenRouterPlugin)
+      yield* addPlugin(plugin, OpenRouterPlugin)
       yield* catalog.transform((catalog) => {
         const openrouter = provider("openrouter", {
           api: { type: "aisdk", package: "@openrouter/ai-sdk-provider" },
@@ -105,7 +105,7 @@ describe("OpenRouterPlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
-      yield* plugin.add(OpenRouterPlugin)
+      yield* addPlugin(plugin, OpenRouterPlugin)
       yield* catalog.transform((catalog) => {
         catalog.provider.update(ProviderV2.ID.make("custom-openrouter"), () => {})
         catalog.model.update(ProviderV2.ID.make("custom-openrouter"), ModelV2.ID.make("gpt-5-chat-latest"), () => {})

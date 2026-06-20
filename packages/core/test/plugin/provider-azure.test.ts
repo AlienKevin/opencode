@@ -12,7 +12,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { location } from "../fixture/location"
 import { testEffect } from "../lib/effect"
-import { fakeSelectorSdk, it, model, npmLayer, provider, withEnv } from "./provider-helper"
+import { addPlugin, fakeSelectorSdk, it, model, npmLayer, provider, withEnv } from "./provider-helper"
 
 const database = Database.layerFromPath(":memory:").pipe(Layer.fresh)
 const preferences = Credential.layer.pipe(Layer.provide(database))
@@ -37,7 +37,7 @@ describe("AzurePlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(AzurePlugin)
+        yield* addPlugin(plugin, AzurePlugin)
         yield* catalog.transform((catalog) => {
           catalog.provider.update(ProviderV2.ID.azure, (item) => {
             item.api = { type: "aisdk", package: "@ai-sdk/azure" }
@@ -53,7 +53,7 @@ describe("AzurePlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(AzurePlugin)
+        yield* addPlugin(plugin, AzurePlugin)
         yield* catalog.transform((catalog) => {
           const azure = provider("azure", {
             api: { type: "aisdk", package: "@ai-sdk/azure" },
@@ -89,7 +89,7 @@ describe("AzurePlugin", () => {
               metadata: { resourceName: "from-account" },
             }),
           })
-          yield* plugin.add(AzurePlugin)
+          yield* addPlugin(plugin, AzurePlugin)
           yield* catalog.transform((catalog) => {
             catalog.provider.update(ProviderV2.ID.azure, (item) => {
               item.api = { type: "aisdk", package: "@ai-sdk/azure" }
@@ -105,7 +105,7 @@ describe("AzurePlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(AzurePlugin)
+        yield* addPlugin(plugin, AzurePlugin)
         yield* catalog.transform((catalog) => {
           const azure = provider("azure", {
             api: { type: "aisdk", package: "@ai-sdk/azure" },
@@ -126,7 +126,7 @@ describe("AzurePlugin", () => {
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
-        yield* plugin.add(AzurePlugin)
+        yield* addPlugin(plugin, AzurePlugin)
         yield* catalog.transform((catalog) => {
           const azure = provider("azure", {
             api: { type: "aisdk", package: "@ai-sdk/azure" },
@@ -146,7 +146,7 @@ describe("AzurePlugin", () => {
     withEnv({ AZURE_RESOURCE_NAME: undefined }, () =>
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
-        yield* plugin.add(AzurePlugin)
+        yield* addPlugin(plugin, AzurePlugin)
         const result = yield* plugin.trigger(
           "aisdk.sdk",
           {
@@ -165,7 +165,7 @@ describe("AzurePlugin", () => {
     withEnv({ AZURE_RESOURCE_NAME: undefined }, () =>
       Effect.gen(function* () {
         const plugin = yield* PluginV2.Service
-        yield* plugin.add(AzurePlugin)
+        yield* addPlugin(plugin, AzurePlugin)
         const exit = yield* plugin
           .trigger(
             "aisdk.sdk",
@@ -182,7 +182,7 @@ describe("AzurePlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: string[] = []
-      yield* plugin.add(AzurePlugin)
+      yield* addPlugin(plugin, AzurePlugin)
       yield* plugin.trigger(
         "aisdk.language",
         { model: model("azure", "deployment"), sdk: fakeSelectorSdk(calls), options: { useCompletionUrls: true } },
@@ -196,7 +196,7 @@ describe("AzurePlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: string[] = []
-      yield* plugin.add(AzurePlugin)
+      yield* addPlugin(plugin, AzurePlugin)
       yield* plugin.trigger(
         "aisdk.language",
         { model: model("azure", "deployment"), sdk: fakeSelectorSdk(calls), options: { useCompletionUrls: true } },
@@ -210,7 +210,7 @@ describe("AzurePlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: string[] = []
-      yield* plugin.add(AzurePlugin)
+      yield* addPlugin(plugin, AzurePlugin)
       yield* plugin.trigger(
         "aisdk.language",
         {
@@ -230,7 +230,7 @@ describe("AzurePlugin", () => {
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const calls: string[] = []
-      yield* plugin.add(AzurePlugin)
+      yield* addPlugin(plugin, AzurePlugin)
       yield* plugin.trigger(
         "aisdk.language",
         { model: model("azure", "deployment"), sdk: fakeSelectorSdk(calls), options: {} },
@@ -254,7 +254,7 @@ describe("AzurePlugin", () => {
         calls.push(`${method}:${id}`)
         return { modelId: id, provider: method, specificationVersion: "v3" }
       }
-      yield* plugin.add(AzurePlugin)
+      yield* addPlugin(plugin, AzurePlugin)
       yield* plugin.trigger(
         "aisdk.language",
         {
