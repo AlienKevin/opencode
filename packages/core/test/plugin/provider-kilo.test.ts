@@ -22,8 +22,7 @@ describe("KiloPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(KiloPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const kilo = provider("kilo", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://api.kilo.ai/api/gateway" },
           request: { headers: { Existing: "value" }, body: {} },
@@ -48,8 +47,7 @@ describe("KiloPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(KiloPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const item = provider("kilo", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://api.kilo.ai/api/gateway" },
         })
@@ -74,8 +72,7 @@ describe("KiloPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(KiloPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const kilo = provider("kilo", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://api.kilo.ai/api/gateway" },
         })

@@ -58,8 +58,7 @@ describe("CloudflareWorkersAIPlugin", () => {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
         yield* plugin.add(CloudflareWorkersAIPlugin)
-        const transform = yield* catalog.transform()
-        yield* transform((catalog) =>
+        yield* catalog.transform((catalog) =>
           catalog.provider.update(ProviderV2.ID.make("cloudflare-workers-ai"), (provider) => {
             provider.api = { type: "aisdk", package: "test-provider" }
           }),
@@ -90,8 +89,7 @@ describe("CloudflareWorkersAIPlugin", () => {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
         yield* plugin.add(CloudflareWorkersAIPlugin)
-        const transform = yield* catalog.transform()
-        yield* transform((catalog) =>
+        yield* catalog.transform((catalog) =>
           catalog.provider.update(ProviderV2.ID.make("cloudflare-workers-ai"), (provider) => {
             provider.api = { type: "aisdk", package: "test-provider", url: "https://proxy.example/v1" }
           }),
@@ -146,8 +144,7 @@ describe("CloudflareWorkersAIPlugin", () => {
             }),
           })
           yield* plugin.add(CloudflareWorkersAIPlugin)
-          const transform = yield* catalog.transform()
-          yield* transform((catalog) =>
+          yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("cloudflare-workers-ai"), (provider) => {
               provider.api = { type: "aisdk", package: "test-provider" }
             }),
@@ -168,8 +165,7 @@ describe("CloudflareWorkersAIPlugin", () => {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
         yield* plugin.add(CloudflareWorkersAIPlugin)
-        const transform = yield* catalog.transform()
-        yield* transform((catalog) =>
+        yield* catalog.transform((catalog) =>
           catalog.provider.update(ProviderV2.ID.make("cloudflare-workers-ai"), (provider) => {
             provider.api = { type: "aisdk", package: "test-provider" }
             provider.request.body.accountId = "configured-acct"

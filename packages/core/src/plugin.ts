@@ -2,6 +2,7 @@ export * as PluginV2 from "./plugin"
 
 import { createDraft, finishDraft, type Draft } from "immer"
 import type { LanguageModelV3 } from "@ai-sdk/provider"
+import type { PluginHost } from "@opencode-ai/plugin/v2/effect"
 import { Context, Effect, Exit, Layer, Schema, Scope } from "effect"
 import type { ModelV2 } from "./model"
 import type { Catalog } from "./catalog"
@@ -22,7 +23,7 @@ export const Event = {
 
 type HookSpec = {
   "catalog.transform": {
-    input: Catalog.Editor
+    input: Catalog.Draft
     output: {}
   }
   "aisdk.language": {
@@ -62,9 +63,12 @@ export type HookFunctions = {
 export type HookInput<Name extends keyof Hooks> = HookSpec[Name]["input"]
 export type HookOutput<Name extends keyof Hooks> = HookSpec[Name]["output"]
 
-export type Effect<R = never> = Effect.Effect<HookFunctions | void, never, R | Scope.Scope>
+export type Host = PluginHost
 
-export function define<R>(input: { id: ID; effect: Effect.Effect<HookFunctions | void, never, R> }) {
+type Executable<R = never> = Effect.Effect<HookFunctions | void, never, R | Scope.Scope>
+export type Effect<R = never> = Executable<R> | ((host: Host) => Executable<R>)
+
+export function define<const E extends Effect<any>>(input: { id: ID; effect: E }) {
   return input
 }
 
@@ -117,14 +121,12 @@ export const layer = Layer.effect(
               }),
               Effect.onExit((exit) => (Exit.isFailure(exit) ? Scope.close(childScope, exit) : Effect.void)),
             )
-            hooks = [
-              ...hooks.filter((item) => item.id !== input.id),
-              {
-                id: input.id,
-                hooks: result ?? {},
-                scope: childScope,
-              },
-            ]
+            const next = {
+              id: input.id,
+              hooks: result ?? {},
+              scope: childScope,
+            }
+            hooks = existing ? hooks.with(hooks.indexOf(existing), next) : [...hooks, next]
             yield* events.publish(Event.Added, { id: input.id })
           }),
         )

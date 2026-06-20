@@ -1,5 +1,4 @@
-import { DateTime, Schema } from "effect"
-import { DateTimeUtcFromMillis } from "effect/Schema"
+import { Schema, Types } from "effect"
 import { ProviderV2 } from "./provider"
 import { ModelRequest } from "./model-request"
 
@@ -69,7 +68,7 @@ export class Info extends Schema.Class<Info>("ModelV2.Info")({
     ...ModelRequest.Request.fields,
   }).pipe(Schema.Array),
   time: Schema.Struct({
-    released: DateTimeUtcFromMillis,
+    released: Schema.Finite,
   }),
   cost: Cost.pipe(Schema.Array),
   status: Schema.Literals(["alpha", "beta", "deprecated", "active"]),
@@ -103,7 +102,7 @@ export class Info extends Schema.Class<Info>("ModelV2.Info")({
       },
       variants: [],
       time: {
-        released: DateTime.makeUnsafe(0),
+        released: 0,
       },
       cost: [],
       status: "active",
@@ -114,6 +113,10 @@ export class Info extends Schema.Class<Info>("ModelV2.Info")({
       },
     })
   }
+}
+
+export type MutableInfo = Omit<Types.DeepMutable<Info>, "api"> & {
+  api: ProviderV2.MutableApi<Api>
 }
 
 export function parse(input: string): { providerID: ProviderV2.ID; modelID: ID } {

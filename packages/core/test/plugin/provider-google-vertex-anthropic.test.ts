@@ -22,8 +22,7 @@ describe("GoogleVertexAnthropicPlugin", () => {
           const plugin = yield* PluginV2.Service
           const catalog = yield* Catalog.Service
           yield* plugin.add(GoogleVertexAnthropicPlugin)
-          const transform = yield* catalog.transform()
-          yield* transform((catalog) =>
+          yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("google-vertex-anthropic"), (provider) => {
               provider.api = { type: "aisdk", package: "@ai-sdk/google-vertex/anthropic" }
             }),
@@ -41,8 +40,7 @@ describe("GoogleVertexAnthropicPlugin", () => {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
         yield* plugin.add(GoogleVertexAnthropicPlugin)
-        const transform = yield* catalog.transform()
-        yield* transform((catalog) =>
+        yield* catalog.transform((catalog) =>
           catalog.provider.update(ProviderV2.ID.make("google-vertex-anthropic"), (provider) => {
             provider.api = { type: "aisdk", package: "@ai-sdk/google-vertex/anthropic" }
             provider.request.body.project = "configured-project"

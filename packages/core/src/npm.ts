@@ -20,7 +20,7 @@ export class InstallFailedError extends Schema.TaggedErrorClass<InstallFailedErr
 
 export interface EntryPoint {
   readonly directory: string
-  readonly entrypoint: Option.Option<string>
+  readonly entrypoint?: string
 }
 
 export interface Interface {
@@ -47,12 +47,11 @@ export function sanitize(pkg: string) {
 }
 
 const resolveEntryPoint = (name: string, dir: string): EntryPoint => {
-  let entrypoint: Option.Option<string>
+  let entrypoint: string | undefined
   try {
-    const resolved = typeof Bun !== "undefined" ? import.meta.resolve(name, dir) : import.meta.resolve(dir)
-    entrypoint = Option.some(resolved)
+    entrypoint = typeof Bun !== "undefined" ? import.meta.resolve(name, dir) : import.meta.resolve(dir)
   } catch {
-    entrypoint = Option.none()
+    entrypoint = undefined
   }
   return {
     directory: dir,
@@ -130,7 +129,7 @@ export const layer = Layer.effect(
       const first = tree.edgesOut.values().next().value?.to
       if (!first) {
         const result = resolveEntryPoint(name, path.join(dir, "node_modules", name))
-        if (Option.isSome(result.entrypoint)) return result
+        if (result.entrypoint) return result
         return yield* new InstallFailedError({ add: [pkg], dir })
       }
       return resolveEntryPoint(first.name, first.path)
@@ -261,11 +260,7 @@ export async function install(...args: Parameters<Interface["install"]>) {
 }
 
 export async function add(...args: Parameters<Interface["add"]>) {
-  const entry = await runPromise((svc) => svc.add(...args))
-  return {
-    directory: entry.directory,
-    entrypoint: Option.getOrUndefined(entry.entrypoint),
-  }
+  return runPromise((svc) => svc.add(...args))
 }
 
 export async function which(...args: Parameters<Interface["which"]>) {

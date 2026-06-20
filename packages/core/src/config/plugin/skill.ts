@@ -11,17 +11,13 @@ import { SkillV2 } from "../../skill"
 
 export const Plugin = PluginV2.define({
   id: PluginV2.ID.make("config-skill"),
-  effect: Effect.gen(function* () {
+  effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
-    const global = yield* Global.Service
-    const location = yield* Location.Service
-    const skill = yield* SkillV2.Service
-    const transform = yield* skill.transform()
     const entries = yield* config.entries()
     const directories = entries.flatMap((entry) => (entry.type === "directory" ? [entry.path] : []))
     const items = entries.flatMap((entry) => (entry.type === "document" ? (entry.info.skills ?? []) : []))
 
-    yield* transform((editor) => {
+    yield* ctx.skill.transform((editor) => {
       for (const directory of directories) {
         editor.source(
           new SkillV2.DirectorySource({ type: "directory", path: AbsolutePath.make(path.join(directory, "skill")) }),
@@ -35,11 +31,11 @@ export const Plugin = PluginV2.define({
           editor.source(new SkillV2.UrlSource({ type: "url", url: item }))
           continue
         }
-        const expanded = item.startsWith("~/") ? path.join(global.home, item.slice(2)) : item
+        const expanded = item.startsWith("~/") ? path.join(ctx.path.home, item.slice(2)) : item
         editor.source(
           new SkillV2.DirectorySource({
             type: "directory",
-            path: AbsolutePath.make(path.isAbsolute(expanded) ? expanded : path.join(location.directory, expanded)),
+            path: AbsolutePath.make(path.isAbsolute(expanded) ? expanded : path.join(ctx.location.directory, expanded)),
           }),
         )
       }

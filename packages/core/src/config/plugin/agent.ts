@@ -35,8 +35,7 @@ const agentKeys = new Set([
 
 export const Plugin = PluginV2.define({
   id: PluginV2.ID.make("config-agent"),
-  effect: Effect.gen(function* () {
-    const agent = yield* AgentV2.Service
+  effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
     const fs = yield* FSUtil.Service
     const documents = yield* Effect.forEach(yield* config.entries(), (entry) => {
@@ -56,7 +55,7 @@ export const Plugin = PluginV2.define({
       })
     }).pipe(Effect.map((documents) => documents.flat()))
 
-    yield* agent.update((editor) => {
+    yield* ctx.agent.transform((editor) => {
       const global = documents.flatMap((document) => document.info.permissions ?? [])
       const configuredDefault = Config.latest(documents, "default_agent")
       if (configuredDefault !== undefined) editor.default(AgentV2.ID.make(configuredDefault))

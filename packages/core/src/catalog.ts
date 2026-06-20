@@ -1,7 +1,6 @@
 export * as Catalog from "./catalog"
 
 import { Array, Context, Effect, Layer, Option, Order, pipe, Schema, Scope, Stream } from "effect"
-import { castDraft, enableMapSet, type Draft } from "immer"
 import { ModelV2 } from "./model"
 import { ModelRequest } from "./model-request"
 import { PluginV2 } from "./plugin"
@@ -13,8 +12,8 @@ import { State } from "./state"
 import { Integration } from "./integration"
 
 export type ProviderRecord = {
-  provider: ProviderV2.Info
-  models: Map<ModelV2.ID, ModelV2.Info>
+  provider: ProviderV2.MutableInfo
+  models: Map<ModelV2.ID, ModelV2.MutableInfo>
 }
 
 export type DefaultModel = { providerID: ProviderV2.ID; modelID: ModelV2.ID }
@@ -42,16 +41,16 @@ type Data = {
   defaultModel?: DefaultModel
 }
 
-export type Editor = {
+export type Draft = {
   provider: {
     list: () => readonly ProviderRecord[]
     get: (providerID: ProviderV2.ID) => ProviderRecord | undefined
-    update: (providerID: ProviderV2.ID, fn: (provider: Draft<ProviderV2.Info>) => void) => void
+    update: (providerID: ProviderV2.ID, fn: (provider: ProviderV2.MutableInfo) => void) => void
     remove: (providerID: ProviderV2.ID) => void
   }
   model: {
     get: (providerID: ProviderV2.ID, modelID: ModelV2.ID) => ModelV2.Info | undefined
-    update: (providerID: ProviderV2.ID, modelID: ModelV2.ID, fn: (model: Draft<ModelV2.Info>) => void) => void
+    update: (providerID: ProviderV2.ID, modelID: ModelV2.ID, fn: (model: ModelV2.MutableInfo) => void) => void
     remove: (providerID: ProviderV2.ID, modelID: ModelV2.ID) => void
     default: {
       get: () => DefaultModel | undefined
@@ -60,8 +59,7 @@ export type Editor = {
   }
 }
 
-export interface Interface {
-  readonly transform: State.Interface<Data, Editor>["transform"]
+export interface Interface extends State.Transformable<Draft> {
   readonly provider: {
     readonly get: (providerID: ProviderV2.ID) => Effect.Effect<ProviderV2.Info, ProviderNotFoundError>
     readonly all: () => Effect.Effect<ProviderV2.Info[]>
@@ -80,8 +78,6 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Catalog") {}
-
-enableMapSet()
 
 export const layer = Layer.effect(
   Service,
@@ -126,26 +122,26 @@ export const layer = Layer.effect(
       return match
     }
 
-    const normalizeApi = (item: Draft<ProviderV2.Info> | Draft<ModelV2.Info>) => {
+    const normalizeApi = (item: ProviderV2.MutableInfo | ModelV2.MutableInfo) => {
       if (typeof item.request.body.baseURL !== "string") return
       item.api.url = item.request.body.baseURL
       delete item.request.body.baseURL
     }
 
-    const state = State.create<Data, Editor>({
+    const state = State.create<Data, Draft>({
       initial: () => ({ providers: new Map() }),
-      editor: (draft) => {
-        const result: Editor = {
+      draft: (draft) => {
+        const result: Draft = {
           provider: {
             list: () => Array.fromIterable(draft.providers.values()) as ProviderRecord[],
             get: (providerID) => draft.providers.get(providerID),
             update: (providerID, fn) => {
               let current = draft.providers.get(providerID)
               if (!current) {
-                current = castDraft({
-                  provider: ProviderV2.Info.empty(providerID),
-                  models: new Map<ModelV2.ID, ModelV2.Info>(),
-                })
+                current = {
+                  provider: ProviderV2.Info.empty(providerID) as ProviderV2.MutableInfo,
+                  models: new Map<ModelV2.ID, ModelV2.MutableInfo>(),
+                }
                 draft.providers.set(providerID, current)
               }
               fn(current.provider)
@@ -160,13 +156,14 @@ export const layer = Layer.effect(
             update: (providerID, modelID, fn) => {
               let record = draft.providers.get(providerID)
               if (!record) {
-                record = castDraft({
-                  provider: ProviderV2.Info.empty(providerID),
-                  models: new Map<ModelV2.ID, ModelV2.Info>(),
-                })
+                record = {
+                  provider: ProviderV2.Info.empty(providerID) as ProviderV2.MutableInfo,
+                  models: new Map<ModelV2.ID, ModelV2.MutableInfo>(),
+                }
                 draft.providers.set(providerID, record)
               }
-              const model = record.models.get(modelID) ?? castDraft(ModelV2.Info.empty(providerID, modelID))
+              const model =
+                record.models.get(modelID) ?? (ModelV2.Info.empty(providerID, modelID) as ModelV2.MutableInfo)
               if (!record.models.has(modelID)) record.models.set(modelID, model)
               fn(model)
               model.id = modelID
@@ -186,8 +183,8 @@ export const layer = Layer.effect(
         }
         return result
       },
-      finalize: Effect.fn("CatalogV2.finalize")(function* (catalog, reason) {
-        if (reason !== "plugin.added") yield* plugin.trigger("catalog.transform", catalog, {}).pipe(Effect.asVoid)
+      finalize: Effect.fn("CatalogV2.finalize")(function* (catalog) {
+        yield* plugin.trigger("catalog.transform", catalog, {}).pipe(Effect.asVoid)
         if (policy.hasStatements()) {
           for (const record of [...catalog.provider.list()]) {
             if ((yield* policy.evaluate("provider.use", record.provider.id, "allow")) === "deny") {
@@ -204,14 +201,13 @@ export const layer = Layer.effect(
         (event) =>
           event.location?.directory === location.directory && event.location.workspaceID === location.workspaceID,
       ),
-      Stream.runForEach((event) =>
-        state.mutate((catalog) => plugin.triggerFor(event.data.id, "catalog.transform", catalog, {}), "plugin.added"),
-      ),
+      Stream.runForEach(() => state.rebuild()),
       Effect.forkIn(scope, { startImmediately: true }),
     )
 
     const result: Interface = {
       transform: state.transform,
+      rebuild: state.rebuild,
 
       provider: {
         get: Effect.fn("CatalogV2.provider.get")(function* (providerID) {
@@ -250,7 +246,7 @@ export const layer = Layer.effect(
             Array.flatMap((record) => {
               return Array.fromIterable(record.models.values()).map((model) => projectModel(model, record.provider))
             }),
-            Array.sortWith((item) => item.time.released.epochMilliseconds, Order.flip(Order.Number)),
+            Array.sortWith((item) => item.time.released, Order.flip(Order.Number)),
           )
         }),
 
@@ -274,7 +270,7 @@ export const layer = Layer.effect(
 
           return pipe(
             yield* result.model.available(),
-            Array.sortWith((item) => item.time.released.epochMilliseconds, Order.flip(Order.Number)),
+            Array.sortWith((item) => item.time.released, Order.flip(Order.Number)),
             Array.head,
           )
         }),
@@ -302,7 +298,7 @@ export const layer = Layer.effect(
             Array.map((model) => ({
               model,
               cost: model.cost[0] ? model.cost[0].input + model.cost[0].output : 999,
-              age: (Date.now() - model.time.released.epochMilliseconds) / (1000 * 60 * 60 * 24 * 30),
+              age: (Date.now() - model.time.released) / (1000 * 60 * 60 * 24 * 30),
               small: SMALL_MODEL_RE.test(`${model.id} ${model.family ?? ""} ${model.name}`.toLowerCase()),
             })),
             Array.filter((item) => item.cost > 0 && item.age <= 18),

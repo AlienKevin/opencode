@@ -99,10 +99,8 @@ Rules:
 
 export const Plugin = PluginV2.define({
   id: PluginV2.ID.make("agent"),
-  effect: Effect.gen(function* () {
-    const agent = yield* AgentV2.Service
-    const location = yield* Location.Service
-    const worktree = location.directory
+  effect: Effect.fn(function* (ctx) {
+    const worktree = ctx.location.directory
     const whitelistedDirs = [TRUNCATION_GLOB, path.join(Global.Path.tmp, "*")]
     const readonlyExternalDirectory: PermissionV2.Ruleset = [
       { action: "external_directory", resource: "*", effect: "ask" },
@@ -122,7 +120,7 @@ export const Plugin = PluginV2.define({
       { action: "read", resource: "*.env.example", effect: "allow" },
     ]
 
-    yield* agent.update((editor) => {
+    yield* ctx.agent.transform((editor) => {
       editor.update(AgentV2.defaultID, (item) => {
         item.description = "The default agent. Executes tools based on configured permissions."
         item.system ??= BUILD_SYSTEM

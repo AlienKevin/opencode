@@ -12,11 +12,8 @@ export const CustomizeOpencodeContent = customizeOpencodeContent
 
 export const Plugin = PluginV2.define({
   id: PluginV2.ID.make("skill"),
-  effect: Effect.gen(function* () {
-    const skill = yield* SkillV2.Service
-    const transform = yield* skill.transform()
-
-    yield* transform((editor) => {
+  effect: Effect.fn(function* (ctx) {
+    yield* ctx.skill.transform((editor) => {
       editor.source(
         new SkillV2.EmbeddedSource({
           type: "embedded",

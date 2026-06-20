@@ -13,7 +13,18 @@ function shouldUseResponses(modelID: string) {
 
 export const GithubCopilotPlugin = PluginV2.define({
   id: PluginV2.ID.make("github-copilot"),
-  effect: Effect.gen(function* () {
+  effect: Effect.fn(function* (ctx) {
+    yield* ctx.catalog.transform(
+      Effect.fn(function* (evt) {
+        const item = evt.provider.get(ProviderV2.ID.githubCopilot)
+        if (!item || !item.models.has(ModelV2.ID.make("gpt-5-chat-latest"))) return
+        evt.model.update(item.provider.id, ModelV2.ID.make("gpt-5-chat-latest"), (model) => {
+          // This chat-only alias conflicts with the Copilot GPT-5 Responses route,
+          // so hide it only for Copilot rather than for every provider catalog.
+          model.enabled = false
+        })
+      }),
+    )
     return {
       "aisdk.sdk": Effect.fn(function* (evt) {
         if (evt.package !== "@ai-sdk/github-copilot") return
@@ -29,15 +40,6 @@ export const GithubCopilotPlugin = PluginV2.define({
         evt.language = shouldUseResponses(evt.model.api.id)
           ? evt.sdk.responses(evt.model.api.id)
           : evt.sdk.chat(evt.model.api.id)
-      }),
-      "catalog.transform": Effect.fn(function* (evt) {
-        const item = evt.provider.get(ProviderV2.ID.githubCopilot)
-        if (!item || !item.models.has(ModelV2.ID.make("gpt-5-chat-latest"))) return
-        evt.model.update(item.provider.id, ModelV2.ID.make("gpt-5-chat-latest"), (model) => {
-          // This chat-only alias conflicts with the Copilot GPT-5 Responses route,
-          // so hide it only for Copilot rather than for every provider catalog.
-          model.enabled = false
-        })
       }),
     }
   }),

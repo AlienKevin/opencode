@@ -12,8 +12,7 @@ describe("AnthropicPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(AnthropicPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const item = provider("anthropic", {
           api: { type: "aisdk", package: "@ai-sdk/anthropic" },
           request: { headers: { Existing: "1" }, body: {} },
@@ -35,8 +34,7 @@ describe("AnthropicPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(AnthropicPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => catalog.provider.update(provider("openai").id, () => {}))
+      yield* catalog.transform((catalog) => catalog.provider.update(provider("openai").id, () => {}))
       expect((yield* catalog.provider.get(ProviderV2.ID.openai)).request.headers["anthropic-beta"]).toBeUndefined()
     }),
   )

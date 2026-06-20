@@ -179,8 +179,7 @@ describe("GitLabPlugin", () => {
             value: new Credential.Key({ type: "key", key: "account-token" }),
           })
           yield* plugin.add(GitLabPlugin)
-          const transform = yield* catalog.transform()
-          yield* transform((catalog) => catalog.provider.update(ProviderV2.ID.make("gitlab"), () => {}))
+          yield* catalog.transform((catalog) => catalog.provider.update(ProviderV2.ID.make("gitlab"), () => {}))
           const provider = yield* catalog.provider.get(ProviderV2.ID.make("gitlab"))
           yield* plugin.trigger(
             "aisdk.sdk",
@@ -218,8 +217,7 @@ describe("GitLabPlugin", () => {
             }),
           })
           yield* plugin.add(GitLabPlugin)
-          const transform = yield* catalog.transform()
-          yield* transform((catalog) => catalog.provider.update(ProviderV2.ID.make("gitlab"), () => {}))
+          yield* catalog.transform((catalog) => catalog.provider.update(ProviderV2.ID.make("gitlab"), () => {}))
           const provider = yield* catalog.provider.get(ProviderV2.ID.make("gitlab"))
           yield* plugin.trigger(
             "aisdk.sdk",

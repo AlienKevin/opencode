@@ -8,6 +8,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { it, withEnv } from "../plugin/provider-helper"
+import { catalogHost, host, integrationHost } from "../plugin/host"
 
 function request(headers: Record<string, string>, variant?: string) {
   return {
@@ -58,10 +59,10 @@ describe("ConfigProviderPlugin.Plugin", () => {
 
       yield* plugin.add({
         ...ConfigProviderPlugin.Plugin,
-        effect: ConfigProviderPlugin.Plugin.effect.pipe(
+        effect: ConfigProviderPlugin.Plugin.effect(
+          host({ catalog: catalogHost(catalog), integration: integrationHost(integrations) }),
+        ).pipe(
           Effect.provideService(Config.Service, config),
-          Effect.provideService(Catalog.Service, catalog),
-          Effect.provideService(Integration.Service, integrations),
         ),
       })
 
@@ -119,10 +120,10 @@ describe("ConfigProviderPlugin.Plugin", () => {
 
       yield* plugin.add({
         ...ConfigProviderPlugin.Plugin,
-        effect: ConfigProviderPlugin.Plugin.effect.pipe(
+        effect: ConfigProviderPlugin.Plugin.effect(
+          host({ catalog: catalogHost(catalog), integration: integrationHost(integrations) }),
+        ).pipe(
           Effect.provideService(Config.Service, config),
-          Effect.provideService(Catalog.Service, catalog),
-          Effect.provideService(Integration.Service, integrations),
         ),
       })
 
@@ -222,10 +223,10 @@ describe("ConfigProviderPlugin.Plugin", () => {
 
         yield* plugin.add({
           ...ConfigProviderPlugin.Plugin,
-          effect: ConfigProviderPlugin.Plugin.effect.pipe(
+          effect: ConfigProviderPlugin.Plugin.effect(
+            host({ catalog: catalogHost(catalog), integration: integrationHost(integrations) }),
+          ).pipe(
             Effect.provideService(Config.Service, config),
-            Effect.provideService(Catalog.Service, catalog),
-            Effect.provideService(Integration.Service, integrations),
           ),
         })
 

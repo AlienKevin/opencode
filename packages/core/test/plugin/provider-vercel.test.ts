@@ -12,8 +12,7 @@ describe("VercelPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(VercelPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const item = provider("vercel", {
           api: { type: "aisdk", package: "@ai-sdk/vercel" },
           request: { headers: { Existing: "1" }, body: {} },
@@ -36,8 +35,7 @@ describe("VercelPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(VercelPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const item = provider("vercel", { api: { type: "aisdk", package: "@ai-sdk/vercel" } })
         catalog.provider.update(item.id, (draft) => {
           draft.api = item.api
@@ -69,8 +67,7 @@ describe("VercelPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(VercelPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => catalog.provider.update(provider("gateway").id, () => {}))
+      yield* catalog.transform((catalog) => catalog.provider.update(provider("gateway").id, () => {}))
       expect((yield* catalog.provider.get(ProviderV2.ID.make("gateway"))).request.headers).toEqual({})
     }),
   )

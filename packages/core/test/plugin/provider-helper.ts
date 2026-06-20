@@ -23,7 +23,7 @@ const locationLayer = Layer.succeed(
 export const npmLayer = Layer.succeed(
   Npm.Service,
   Npm.Service.of({
-    add: () => Effect.succeed({ directory: "", entrypoint: Option.none<string>() }),
+    add: () => Effect.succeed({ directory: "", entrypoint: undefined }),
     install: () => Effect.void,
     which: () => Effect.succeed(Option.none<string>()),
   }),
@@ -32,7 +32,8 @@ export const npmLayer = Layer.succeed(
 export const catalogLayer = Layer.succeed(
   Catalog.Service,
   Catalog.Service.of({
-    transform: () => Effect.die("unexpected catalog.transform"),
+    transform: (_transform) => Effect.die("unexpected catalog.transform"),
+    rebuild: () => Effect.die("unexpected catalog.rebuild"),
     provider: {
       get: () => Effect.die("unexpected provider.get"),
       all: () => Effect.succeed([]),

@@ -40,8 +40,7 @@ describe("GoogleVertexPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(GoogleVertexPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) =>
+      yield* catalog.transform((catalog) =>
         catalog.provider.update(ProviderV2.ID.opencode, (provider) => {
           provider.api = {
             type: "aisdk",
@@ -71,8 +70,7 @@ describe("GoogleVertexPlugin", () => {
           const plugin = yield* PluginV2.Service
           const catalog = yield* Catalog.Service
           yield* plugin.add(GoogleVertexPlugin)
-          const transform = yield* catalog.transform()
-          yield* transform((catalog) =>
+          yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
               provider.api = {
                 type: "aisdk",
@@ -110,8 +108,7 @@ describe("GoogleVertexPlugin", () => {
           const plugin = yield* PluginV2.Service
           const catalog = yield* Catalog.Service
           yield* plugin.add(GoogleVertexPlugin)
-          const transform = yield* catalog.transform()
-          yield* transform((catalog) =>
+          yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
               provider.api = {
                 type: "aisdk",
@@ -160,8 +157,7 @@ describe("GoogleVertexPlugin", () => {
           const plugin = yield* PluginV2.Service
           const catalog = yield* Catalog.Service
           yield* plugin.add(GoogleVertexPlugin)
-          const transform = yield* catalog.transform()
-          yield* transform((catalog) =>
+          yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
               provider.api = {
                 type: "aisdk",
@@ -189,8 +185,7 @@ describe("GoogleVertexPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(GoogleVertexPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) =>
+      yield* catalog.transform((catalog) =>
         catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
           provider.api = {
             type: "aisdk",
@@ -225,8 +220,7 @@ describe("GoogleVertexPlugin", () => {
           const plugin = yield* PluginV2.Service
           const catalog = yield* Catalog.Service
           yield* plugin.add(GoogleVertexPlugin)
-          const transform = yield* catalog.transform()
-          yield* transform((catalog) =>
+          yield* catalog.transform((catalog) =>
             catalog.provider.update(ProviderV2.ID.make("google-vertex"), (provider) => {
               provider.api = { type: "aisdk", package: "@ai-sdk/google-vertex" }
               provider.request.body.project = "config-project"

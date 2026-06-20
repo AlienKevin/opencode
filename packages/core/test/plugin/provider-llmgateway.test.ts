@@ -7,13 +7,17 @@ import { ProviderPlugins } from "@opencode-ai/core/plugin/provider"
 import { LLMGatewayPlugin } from "@opencode-ai/core/plugin/provider/llmgateway"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { expectPluginRegistered, it, provider } from "./provider-helper"
+import { catalogHost, host, integrationHost } from "./host"
 
 describe("LLMGatewayPlugin", () => {
   const add = Effect.fnUntraced(function* (plugin: PluginV2.Interface) {
     const integrations = yield* Integration.Service
+    const catalog = yield* Catalog.Service
     yield* plugin.add({
       ...LLMGatewayPlugin,
-      effect: LLMGatewayPlugin.effect.pipe(Effect.provideService(Integration.Service, integrations)),
+      effect: LLMGatewayPlugin.effect(
+        host({ catalog: catalogHost(catalog), integration: integrationHost(integrations) }),
+      ),
     })
   })
 
@@ -32,12 +36,11 @@ describe("LLMGatewayPlugin", () => {
       const catalog = yield* Catalog.Service
       yield* add(plugin)
       const integrations = yield* Integration.Service
-      yield* integrations.update((editor) => {
+      yield* integrations.transform((editor) => {
         editor.update(Integration.ID.make("llmgateway"), () => {})
         editor.update(Integration.ID.make("openrouter"), () => {})
       })
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const llmgateway = provider("llmgateway", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://api.llmgateway.io/v1" },
           request: { headers: { Existing: "value" }, body: {} },
@@ -63,8 +66,7 @@ describe("LLMGatewayPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* add(plugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const item = provider("llmgateway", {
           api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url: "https://api.llmgateway.io/v1" },
         })

@@ -31,8 +31,7 @@ describe("AmazonBedrockPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(AmazonBedrockPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const bedrock = provider("amazon-bedrock", {
           api: { type: "aisdk", package: "@ai-sdk/amazon-bedrock" },
           request: {

@@ -23,8 +23,7 @@ describe("OpenRouterPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(OpenRouterPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const openrouter = provider("openrouter", {
           api: { type: "aisdk", package: "@openrouter/ai-sdk-provider" },
           request: { headers: { Existing: "value" }, body: {} },
@@ -75,8 +74,7 @@ describe("OpenRouterPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(OpenRouterPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         const openrouter = provider("openrouter", {
           api: { type: "aisdk", package: "@openrouter/ai-sdk-provider" },
         })
@@ -108,8 +106,7 @@ describe("OpenRouterPlugin", () => {
       const plugin = yield* PluginV2.Service
       const catalog = yield* Catalog.Service
       yield* plugin.add(OpenRouterPlugin)
-      const transform = yield* catalog.transform()
-      yield* transform((catalog) => {
+      yield* catalog.transform((catalog) => {
         catalog.provider.update(ProviderV2.ID.make("custom-openrouter"), () => {})
         catalog.model.update(ProviderV2.ID.make("custom-openrouter"), ModelV2.ID.make("gpt-5-chat-latest"), () => {})
       })

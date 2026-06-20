@@ -11,12 +11,8 @@ import { ProviderV2 } from "../../provider"
 
 export const Plugin = PluginV2.define({
   id: PluginV2.ID.make("config-provider"),
-  effect: Effect.gen(function* () {
-    const catalog = yield* Catalog.Service
+  effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
-    const integrations = yield* Integration.Service
-    const transform = yield* catalog.transform()
-    const integrationTransform = yield* integrations.transform()
     const entries = yield* config.entries()
     const files = entries.filter((entry): entry is Config.Document => entry.type === "document")
     const configuredIntegrations = new Set(
@@ -24,10 +20,10 @@ export const Plugin = PluginV2.define({
         Object.entries(file.info.providers ?? {}).flatMap(([id, provider]) => (provider.env === undefined ? [] : [id])),
       ),
     )
-    yield* integrationTransform((integrations) => {
+    yield* ctx.integration.transform((integrations) => {
       for (const file of files) {
         for (const [id, item] of Object.entries(file.info.providers ?? {})) {
-          const integrationID = Integration.ID.make(id)
+          const integrationID = id
           if (!configuredIntegrations.has(id) && !integrations.get(integrationID)) continue
           integrations.update(integrationID, (integration) => {
             integration.name = item.name ?? integration.name
@@ -42,7 +38,7 @@ export const Plugin = PluginV2.define({
       }
     })
 
-    yield* transform((catalog) => {
+    yield* ctx.catalog.transform((catalog) => {
       const configuredDefault = Config.latest(entries, "model")
       if (configuredDefault !== undefined) {
         const model = ModelV2.parse(configuredDefault)
@@ -50,7 +46,7 @@ export const Plugin = PluginV2.define({
       }
       for (const file of files) {
         for (const [id, item] of Object.entries(file.info.providers ?? {})) {
-          const providerID = ProviderV2.ID.make(id)
+          const providerID = id
           catalog.provider.update(providerID, (provider) => {
             if (item.name !== undefined) provider.name = item.name
             if (item.api !== undefined) provider.api = { ...item.api }
@@ -63,7 +59,7 @@ export const Plugin = PluginV2.define({
           const providerPackage = providerApi?.type === "aisdk" ? providerApi.package : undefined
 
           for (const [id, config] of Object.entries(item.models ?? {})) {
-            catalog.model.update(providerID, ModelV2.ID.make(id), (model) => {
+            catalog.model.update(providerID, id, (model) => {
               if (config.family !== undefined) model.family = config.family
               if (config.name !== undefined) model.name = config.name
               if (config.api !== undefined) model.api = { ...model.api, ...config.api }

@@ -61,9 +61,9 @@ function selectMantleModel(sdk: MantleSDK, modelID: string) {
 
 export const AmazonBedrockPlugin = PluginV2.define({
   id: PluginV2.ID.make("amazon-bedrock"),
-  effect: Effect.gen(function* () {
-    return {
-      "catalog.transform": Effect.fn(function* (evt) {
+  effect: Effect.fn(function* (ctx) {
+    yield* ctx.catalog.transform(
+      Effect.fn(function* (evt) {
         for (const item of evt.provider.list()) {
           if (item.provider.api.type !== "aisdk") continue
           if (item.provider.api.package !== "@ai-sdk/amazon-bedrock") continue
@@ -77,6 +77,8 @@ export const AmazonBedrockPlugin = PluginV2.define({
           })
         }
       }),
+    )
+    return {
       "aisdk.sdk": Effect.fn(function* (evt) {
         if (!["@ai-sdk/amazon-bedrock", "@ai-sdk/amazon-bedrock/mantle"].includes(evt.package)) return
         const options = { ...evt.options }

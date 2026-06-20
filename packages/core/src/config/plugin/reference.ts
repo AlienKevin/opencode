@@ -12,17 +12,13 @@ import { AbsolutePath } from "../../schema"
 
 export const Plugin = {
   id: PluginV2.ID.make("core/config-reference"),
-  effect: Effect.gen(function* () {
+  effect: Effect.fn(function* (ctx: PluginV2.Host) {
     const config = yield* Config.Service
-    const global = yield* Global.Service
-    const location = yield* Location.Service
-    const references = yield* Reference.Service
-    const update = yield* references.transform()
     const entries = new Map<string, Reference.Source>()
     for (const doc of (yield* config.entries()).filter(
       (entry): entry is Config.Document => entry.type === "document",
     )) {
-      const directory = doc.path ? path.dirname(doc.path) : location.directory
+      const directory = doc.path ? path.dirname(doc.path) : ctx.location.directory
       for (const [name, entry] of Object.entries(doc.info.references ?? {})) {
         if (!validAlias(name)) continue
         entries.set(
@@ -31,7 +27,7 @@ export const Plugin = {
             ? new Reference.LocalSource({
                 type: "local",
                 path: AbsolutePath.make(
-                  localPath(directory, global.home, typeof entry === "string" ? entry : entry.path),
+                  localPath(directory, ctx.path.home, typeof entry === "string" ? entry : entry.path),
                 ),
                 description: typeof entry === "string" ? undefined : entry.description,
                 hidden: typeof entry === "string" ? undefined : entry.hidden,
@@ -47,7 +43,7 @@ export const Plugin = {
       }
     }
 
-    yield* update((editor) => {
+    yield* ctx.reference.transform((editor) => {
       for (const [name, source] of entries) editor.add(name, source)
     })
   }),

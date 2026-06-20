@@ -14,11 +14,9 @@ const decodeCommand = Schema.decodeUnknownOption(ConfigCommand.Info)
 
 export const Plugin = PluginV2.define({
   id: PluginV2.ID.make("config-command"),
-  effect: Effect.gen(function* () {
-    const command = yield* CommandV2.Service
+  effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
     const fs = yield* FSUtil.Service
-    const transform = yield* command.transform()
     const documents = yield* Effect.forEach(yield* config.entries(), (entry) => {
       if (entry.type === "document") return Effect.succeed([{ commands: entry.info.commands }])
       return loadDirectory(fs, entry.path).pipe(
@@ -28,7 +26,7 @@ export const Plugin = PluginV2.define({
       )
     }).pipe(Effect.map((documents) => documents.flat()))
 
-    yield* transform((editor) => {
+    yield* ctx.command.transform((editor) => {
       for (const document of documents) {
         for (const [name, command] of Object.entries(document.commands ?? {})) {
           editor.update(name, (item) => {

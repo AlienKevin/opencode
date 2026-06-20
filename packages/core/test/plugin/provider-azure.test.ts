@@ -38,8 +38,7 @@ describe("AzurePlugin", () => {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
         yield* plugin.add(AzurePlugin)
-        const transform = yield* catalog.transform()
-        yield* transform((catalog) => {
+        yield* catalog.transform((catalog) => {
           catalog.provider.update(ProviderV2.ID.azure, (item) => {
             item.api = { type: "aisdk", package: "@ai-sdk/azure" }
           })
@@ -55,8 +54,7 @@ describe("AzurePlugin", () => {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
         yield* plugin.add(AzurePlugin)
-        const transform = yield* catalog.transform()
-        yield* transform((catalog) => {
+        yield* catalog.transform((catalog) => {
           const azure = provider("azure", {
             api: { type: "aisdk", package: "@ai-sdk/azure" },
             request: { headers: {}, body: { resourceName: "from-config" } },
@@ -92,8 +90,7 @@ describe("AzurePlugin", () => {
             }),
           })
           yield* plugin.add(AzurePlugin)
-          const transform = yield* catalog.transform()
-          yield* transform((catalog) => {
+          yield* catalog.transform((catalog) => {
             catalog.provider.update(ProviderV2.ID.azure, (item) => {
               item.api = { type: "aisdk", package: "@ai-sdk/azure" }
             })
@@ -109,8 +106,7 @@ describe("AzurePlugin", () => {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
         yield* plugin.add(AzurePlugin)
-        const transform = yield* catalog.transform()
-        yield* transform((catalog) => {
+        yield* catalog.transform((catalog) => {
           const azure = provider("azure", {
             api: { type: "aisdk", package: "@ai-sdk/azure" },
             request: { headers: {}, body: { resourceName: "" } },
@@ -131,8 +127,7 @@ describe("AzurePlugin", () => {
         const plugin = yield* PluginV2.Service
         const catalog = yield* Catalog.Service
         yield* plugin.add(AzurePlugin)
-        const transform = yield* catalog.transform()
-        yield* transform((catalog) => {
+        yield* catalog.transform((catalog) => {
           const azure = provider("azure", {
             api: { type: "aisdk", package: "@ai-sdk/azure" },
             request: { headers: {}, body: { resourceName: "   " } },
