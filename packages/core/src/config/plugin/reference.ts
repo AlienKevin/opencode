@@ -12,38 +12,39 @@ export const Plugin = define({
   id: "core/config-reference",
   effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
-    const entries = new Map<string, Reference.Source>()
-    for (const doc of (yield* config.entries()).filter(
-      (entry): entry is Config.Document => entry.type === "document",
-    )) {
-      const directory = doc.path ? path.dirname(doc.path) : ctx.location.directory
-      for (const [name, entry] of Object.entries(doc.info.references ?? {})) {
-        if (!validAlias(name)) continue
-        entries.set(
-          name,
-          local(entry)
-            ? new Reference.LocalSource({
-                type: "local",
-                path: AbsolutePath.make(
-                  localPath(directory, ctx.path.home, typeof entry === "string" ? entry : entry.path),
-                ),
-                description: typeof entry === "string" ? undefined : entry.description,
-                hidden: typeof entry === "string" ? undefined : entry.hidden,
-              })
-            : new Reference.GitSource({
-                type: "git",
-                repository: typeof entry === "string" ? entry : entry.repository,
-                branch: typeof entry === "string" ? undefined : entry.branch,
-                description: typeof entry === "string" ? undefined : entry.description,
-                hidden: typeof entry === "string" ? undefined : entry.hidden,
-              }),
-        )
-      }
-    }
-
-    yield* ctx.reference.transform((editor) => {
-      for (const [name, source] of entries) editor.add(name, source)
-    })
+    yield* ctx.reference.transform(
+      Effect.fn(function* (draft) {
+        const entries = new Map<string, Reference.Source>()
+        for (const doc of (yield* config.entries()).filter(
+          (entry): entry is Config.Document => entry.type === "document",
+        )) {
+          const directory = doc.path ? path.dirname(doc.path) : ctx.location.directory
+          for (const [name, entry] of Object.entries(doc.info.references ?? {})) {
+            if (!validAlias(name)) continue
+            entries.set(
+              name,
+              local(entry)
+                ? new Reference.LocalSource({
+                    type: "local",
+                    path: AbsolutePath.make(
+                      localPath(directory, ctx.path.home, typeof entry === "string" ? entry : entry.path),
+                    ),
+                    description: typeof entry === "string" ? undefined : entry.description,
+                    hidden: typeof entry === "string" ? undefined : entry.hidden,
+                  })
+                : new Reference.GitSource({
+                    type: "git",
+                    repository: typeof entry === "string" ? entry : entry.repository,
+                    branch: typeof entry === "string" ? undefined : entry.branch,
+                    description: typeof entry === "string" ? undefined : entry.description,
+                    hidden: typeof entry === "string" ? undefined : entry.hidden,
+                  }),
+            )
+          }
+        }
+        for (const [name, source] of entries) draft.add(name, source)
+      }),
+    )
   }),
 })
 

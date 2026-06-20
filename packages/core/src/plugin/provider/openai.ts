@@ -9,9 +9,9 @@ export const OpenAIPlugin = define({
   id: "openai",
   effect: Effect.fn(function* (ctx) {
     const integrations = yield* Integration.Service
-    yield* integrations.transform((editor) => {
-      editor.method.update(browser)
-      editor.method.update(headless)
+    yield* integrations.transform((draft) => {
+      draft.method.update(browser)
+      draft.method.update(headless)
     })
     yield* ctx.catalog.transform(
       Effect.fn(function* (evt) {

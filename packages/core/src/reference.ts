@@ -69,11 +69,11 @@ export const layer = Layer.effect(
         remove: (name) => draft.sources.delete(name),
         list: () => Array.from(draft.sources.entries()) as [string, Source][],
       }),
-      finalize: (editor) =>
+      finalize: (draft) =>
         Effect.gen(function* () {
           materialized.clear()
           const seen = new Map<string, string | undefined>()
-          for (const [name, source] of editor.list()) {
+          for (const [name, source] of draft.list()) {
             if (source.type === "local") {
               materialized.set(
                 name,

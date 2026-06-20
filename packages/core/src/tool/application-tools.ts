@@ -44,8 +44,8 @@ export const layer = Layer.effect(
         if (entries.length === 0) return
         yield* Effect.forEach(entries, ([name]) => Tool.validateName(name), { discard: true })
         const registrations = entries.map(([name, tool]) => [name, { identity: {}, tool }] as const)
-        yield* state.transform((editor) => {
-          for (const [name, entry] of registrations) editor.set(name, entry)
+        yield* state.transform((draft) => {
+          for (const [name, entry] of registrations) draft.set(name, entry)
         })
       }),
       entries: () => state.get().entries,

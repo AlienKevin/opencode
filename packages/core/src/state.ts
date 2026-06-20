@@ -3,9 +3,9 @@ export * as State from "./state"
 import { Effect, Scope, Semaphore } from "effect"
 
 /**
- * A replayable transform applied to an editor during rebuild.
+ * A replayable transform applied to a draft during rebuild.
  *
- * Domain editors hide the draft representation while preserving concise
+ * Domain drafts expose readable and writable state while preserving concise
  * plugin/config code. Transforms may perform Effects before returning.
  */
 type TransformCallback<DraftApi> = (draft: DraftApi) => Effect.Effect<void> | void
