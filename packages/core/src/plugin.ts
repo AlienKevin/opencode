@@ -2,12 +2,12 @@ export * as PluginV2 from "./plugin"
 
 import { createDraft, finishDraft, type Draft } from "immer"
 import type { LanguageModelV3 } from "@ai-sdk/provider"
-import type { PluginHost } from "@opencode-ai/plugin/v2/effect"
 import { Context, Effect, Exit, Layer, Schema, Scope } from "effect"
 import type { ModelV2 } from "./model"
 import type { Catalog } from "./catalog"
 import { EventV2 } from "./event"
 import { KeyedMutex } from "./effect/keyed-mutex"
+import { State } from "./state"
 
 export const ID = Schema.String.pipe(Schema.brand("Plugin.ID"))
 export type ID = typeof ID.Type
@@ -63,26 +63,16 @@ export type HookFunctions = {
 export type HookInput<Name extends keyof Hooks> = HookSpec[Name]["input"]
 export type HookOutput<Name extends keyof Hooks> = HookSpec[Name]["output"]
 
-export type Host = PluginHost
-
-type Executable<R = never> = Effect.Effect<HookFunctions | void, never, R | Scope.Scope>
-export type Effect<R = never> = Executable<R> | ((host: Host) => Executable<R>)
-
-export function define<R>(input: { id: ID; effect: (host: Host) => Executable<R> }): {
-  id: ID
-  effect: (host: Host) => Executable<R>
-}
-export function define<R>(input: { id: ID; effect: Executable<R> }): { id: ID; effect: Executable<R> }
-export function define(input: { id: ID; effect: Effect<any> }) {
-  return input
-}
-
 export interface Interface {
   readonly add: (input: {
-    id: ID
+    id: string
     effect: Effect.Effect<void | HookFunctions, never, Scope.Scope>
   }) => Effect.Effect<void, never, never>
   readonly remove: (id: ID) => Effect.Effect<void>
+  readonly hook: <Name extends keyof Hooks>(
+    name: Name,
+    callback: (input: Hooks[Name]) => Effect.Effect<void> | void,
+  ) => Effect.Effect<State.Registration, never, Scope.Scope>
   readonly triggerFor: <Name extends keyof Hooks>(
     id: ID,
     name: Name,
@@ -106,33 +96,40 @@ export const layer = Layer.effect(
       hooks: HookFunctions
       scope: Scope.Closeable
     }[] = []
+    let registrations: {
+      [Name in keyof Hooks]: {
+        name: Name
+        callback: (input: Hooks[Name]) => Effect.Effect<void> | void
+      }
+    }[keyof Hooks][] = []
     const events = yield* EventV2.Service
     const scope = yield* Scope.Scope
     const locks = KeyedMutex.makeUnsafe<ID>()
 
     const svc = Service.of({
       add: Effect.fn("Plugin.add")(function* (input) {
-        yield* locks.withLock(input.id)(
+        const id = ID.make(input.id)
+        yield* locks.withLock(id)(
           Effect.gen(function* () {
-            const existing = hooks.find((item) => item.id === input.id)
+            const existing = hooks.find((item) => item.id === id)
             if (existing) yield* Scope.close(existing.scope, Exit.void).pipe(Effect.ignore)
             const childScope = yield* Scope.fork(scope)
             const result = yield* input.effect.pipe(
               Scope.provide(childScope),
               Effect.withSpan("Plugin.load", {
                 attributes: {
-                  "plugin.id": input.id,
+                  "plugin.id": id,
                 },
               }),
               Effect.onExit((exit) => (Exit.isFailure(exit) ? Scope.close(childScope, exit) : Effect.void)),
             )
             const next = {
-              id: input.id,
+              id,
               hooks: result ?? {},
               scope: childScope,
             }
             hooks = existing ? hooks.with(hooks.indexOf(existing), next) : [...hooks, next]
-            yield* events.publish(Event.Added, { id: input.id })
+            yield* events.publish(Event.Added, { id })
           }),
         )
       }),
@@ -167,6 +164,12 @@ export const layer = Layer.effect(
           )
         }
 
+        for (const item of registrations) {
+          if (item.name !== name) continue
+          const result = item.callback(event as never)
+          if (Effect.isEffect(result)) yield* result
+        }
+
         for (const [field, draft] of draftEntries) {
           event[field] = finishDraft(draft)
         }
@@ -181,6 +184,19 @@ export const layer = Layer.effect(
             if (existing) yield* Scope.close(existing.scope, Exit.void).pipe(Effect.ignore)
           }),
         )
+      }),
+      hook: Effect.fn("Plugin.hook")(function* (name, callback) {
+        const scope = yield* Scope.Scope
+        const registration = { name, callback } as (typeof registrations)[number]
+        let active = true
+        registrations = [...registrations, registration]
+        const dispose = Effect.sync(() => {
+          if (!active) return
+          active = false
+          registrations = registrations.filter((item) => item !== registration)
+        })
+        yield* Scope.addFinalizer(scope, dispose)
+        return { dispose }
       }),
     })
     return svc

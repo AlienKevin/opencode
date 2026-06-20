@@ -1,14 +1,12 @@
 export * as CommandPlugin from "./command"
 
+import { define } from "@opencode-ai/plugin/v2/effect"
 import { Effect } from "effect"
-import { CommandV2 } from "../command"
-import { Location } from "../location"
-import { PluginV2 } from "../plugin"
 import PROMPT_INITIALIZE from "./command/initialize.txt"
 import PROMPT_REVIEW from "./command/review.txt"
 
-export const Plugin = PluginV2.define({
-  id: PluginV2.ID.make("command"),
+export const Plugin = define({
+  id: "command",
   effect: Effect.fn(function* (ctx) {
     yield* ctx.command.transform((editor) => {
       editor.update("init", (command) => {

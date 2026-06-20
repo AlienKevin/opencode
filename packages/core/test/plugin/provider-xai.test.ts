@@ -44,19 +44,17 @@ describe("XAIPlugin", () => {
       const providers: string[] = []
 
       yield* addPlugin(plugin, XAIPlugin)
-      yield* plugin.add(
-        PluginV2.define({
-          id: PluginV2.ID.make("xai-sdk-name-observer"),
-          effect: Effect.gen(function* () {
-            return {
-              "aisdk.sdk": Effect.fn(function* (evt) {
-                if (!evt.sdk) return
-                providers.push(evt.sdk.responses("grok-4").provider)
-              }),
-            }
-          }),
+      yield* plugin.add({
+        id: PluginV2.ID.make("xai-sdk-name-observer"),
+        effect: Effect.gen(function* () {
+          return {
+            "aisdk.sdk": Effect.fn(function* (evt) {
+              if (!evt.sdk) return
+              providers.push(evt.sdk.responses("grok-4").provider)
+            }),
+          }
         }),
-      )
+      })
 
       yield* plugin.trigger(
         "aisdk.sdk",

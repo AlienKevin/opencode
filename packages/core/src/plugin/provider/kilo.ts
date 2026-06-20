@@ -1,8 +1,8 @@
 import { Effect } from "effect"
-import { PluginV2 } from "../../plugin"
+import { define } from "@opencode-ai/plugin/v2/effect"
 
-export const KiloPlugin = PluginV2.define({
-  id: PluginV2.ID.make("kilo"),
+export const KiloPlugin = define({
+  id: "kilo",
   effect: Effect.fn(function* (ctx) {
     yield* ctx.catalog.transform(
       Effect.fn(function* (evt) {

@@ -1,13 +1,13 @@
 import os from "os"
 import { InstallationVersion } from "../../installation/version"
 import { Effect } from "effect"
-import { PluginV2 } from "../../plugin"
+import { define } from "@opencode-ai/plugin/v2/effect"
 import { ProviderV2 } from "../../provider"
 
 const providerID = ProviderV2.ID.make("cloudflare-workers-ai")
 
-export const CloudflareWorkersAIPlugin = PluginV2.define({
-  id: PluginV2.ID.make("cloudflare-workers-ai"),
+export const CloudflareWorkersAIPlugin = define({
+  id: "cloudflare-workers-ai",
   effect: Effect.fn(function* (ctx) {
     yield* ctx.catalog.transform(
       Effect.fn(function* (evt) {
@@ -21,8 +21,9 @@ export const CloudflareWorkersAIPlugin = PluginV2.define({
         })
       }),
     )
-    return {
-      "aisdk.sdk": Effect.fn(function* (evt) {
+    yield* ctx.aisdk.hook(
+      "sdk",
+      Effect.fn(function* (evt) {
         if (evt.model.providerID !== providerID) return
         if (evt.package !== "@ai-sdk/openai-compatible") return
 
@@ -36,11 +37,14 @@ export const CloudflareWorkersAIPlugin = PluginV2.define({
           }) as any,
         )
       }),
-      "aisdk.language": Effect.fn(function* (evt) {
+    )
+    yield* ctx.aisdk.hook(
+      "language",
+      Effect.fn(function* (evt) {
         if (evt.model.providerID !== providerID) return
         evt.language = evt.sdk.languageModel(evt.model.api.id)
       }),
-    }
+    )
   }),
 })
 

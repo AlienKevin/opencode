@@ -1,13 +1,13 @@
-import { Npm } from "../../npm"
 import { Effect } from "effect"
 import { pathToFileURL } from "url"
-import { PluginV2 } from "../../plugin"
+import { define } from "@opencode-ai/plugin/v2/effect"
 
-export const DynamicProviderPlugin = PluginV2.define({
-  id: PluginV2.ID.make("dynamic-provider"),
+export const DynamicProviderPlugin = define({
+  id: "dynamic-provider",
   effect: Effect.fn(function* (ctx) {
-    return {
-      "aisdk.sdk": Effect.fn(function* (evt) {
+    yield* ctx.aisdk.hook(
+      "sdk",
+      Effect.fn(function* (evt) {
         if (evt.sdk) return
 
         const installedPath = evt.package.startsWith("file://")
@@ -25,6 +25,6 @@ export const DynamicProviderPlugin = PluginV2.define({
 
         evt.sdk = mod[match](evt.options)
       }),
-    }
+    )
   }),
 })

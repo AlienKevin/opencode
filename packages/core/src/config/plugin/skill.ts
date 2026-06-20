@@ -1,16 +1,14 @@
 export * as ConfigSkillPlugin from "./skill"
 
+import { define } from "@opencode-ai/plugin/v2/effect"
 import path from "path"
 import { Effect } from "effect"
 import { Config } from "../../config"
-import { Global } from "../../global"
-import { Location } from "../../location"
-import { PluginV2 } from "../../plugin"
 import { AbsolutePath } from "../../schema"
 import { SkillV2 } from "../../skill"
 
-export const Plugin = PluginV2.define({
-  id: PluginV2.ID.make("config-skill"),
+export const Plugin = define({
+  id: "config-skill",
   effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
     const entries = yield* config.entries()

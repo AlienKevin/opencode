@@ -1,8 +1,8 @@
 import { Effect } from "effect"
-import { PluginV2 } from "../../plugin"
+import { define } from "@opencode-ai/plugin/v2/effect"
 
-export const VercelPlugin = PluginV2.define({
-  id: PluginV2.ID.make("vercel"),
+export const VercelPlugin = define({
+  id: "vercel",
   effect: Effect.fn(function* (ctx) {
     yield* ctx.catalog.transform(
       Effect.fn(function* (evt) {
@@ -16,12 +16,13 @@ export const VercelPlugin = PluginV2.define({
         }
       }),
     )
-    return {
-      "aisdk.sdk": Effect.fn(function* (evt) {
+    yield* ctx.aisdk.hook(
+      "sdk",
+      Effect.fn(function* (evt) {
         if (evt.package !== "@ai-sdk/vercel") return
         const mod = yield* Effect.promise(() => import("@ai-sdk/vercel"))
         evt.sdk = mod.createVercel(evt.options)
       }),
-    }
+    )
   }),
 })

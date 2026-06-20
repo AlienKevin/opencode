@@ -9,6 +9,9 @@ import { Effect, Stream } from "effect"
 
 export function host(overrides: Partial<PluginHost> = {}): PluginHost {
   return {
+    aisdk: {
+      hook: () => Effect.die("unused aisdk.hook"),
+    },
     agent: {
       get: () => Effect.die("unused agent.get"),
       default: () => Effect.die("unused agent.default"),

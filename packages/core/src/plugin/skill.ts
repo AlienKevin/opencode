@@ -2,16 +2,16 @@
 
 export * as SkillPlugin from "./skill"
 
+import { define } from "@opencode-ai/plugin/v2/effect"
 import { Effect } from "effect"
-import { PluginV2 } from "../plugin"
 import { AbsolutePath } from "../schema"
 import { SkillV2 } from "../skill"
 import customizeOpencodeContent from "./skill/customize-opencode.md" with { type: "text" }
 
 export const CustomizeOpencodeContent = customizeOpencodeContent
 
-export const Plugin = PluginV2.define({
-  id: PluginV2.ID.make("skill"),
+export const Plugin = define({
+  id: "skill",
   effect: Effect.fn(function* (ctx) {
     yield* ctx.skill.transform((editor) => {
       editor.source(

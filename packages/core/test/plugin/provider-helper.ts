@@ -1,4 +1,5 @@
 import { Npm } from "@opencode-ai/core/npm"
+import type { Plugin } from "@opencode-ai/plugin/v2/effect"
 import type { LanguageModelV3 } from "@ai-sdk/provider"
 import { expect } from "bun:test"
 import { Effect, Layer, Option } from "effect"
@@ -75,13 +76,7 @@ export const it = testEffect(
   ),
 )
 
-export function addPlugin(
-  plugin: PluginV2.Interface,
-  definition: {
-    readonly id: PluginV2.ID
-    readonly effect: PluginV2.Effect
-  },
-) {
+export function addPlugin(plugin: PluginV2.Interface, definition: Plugin<any>) {
   return Effect.gen(function* () {
     const catalog = yield* Effect.serviceOption(Catalog.Service)
     const integration = yield* Effect.serviceOption(Integration.Service)

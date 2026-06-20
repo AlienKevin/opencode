@@ -1,18 +1,16 @@
 export * as ConfigReferencePlugin from "./reference"
 
+import { define } from "@opencode-ai/plugin/v2/effect"
 import path from "path"
 import { Effect } from "effect"
 import { Config } from "../../config"
 import { ConfigReference } from "../reference"
-import { Global } from "../../global"
-import { Location } from "../../location"
-import { PluginV2 } from "../../plugin"
 import { Reference } from "../../reference"
 import { AbsolutePath } from "../../schema"
 
-export const Plugin = {
-  id: PluginV2.ID.make("core/config-reference"),
-  effect: Effect.fn(function* (ctx: PluginV2.Host) {
+export const Plugin = define({
+  id: "core/config-reference",
+  effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
     const entries = new Map<string, Reference.Source>()
     for (const doc of (yield* config.entries()).filter(
@@ -47,7 +45,7 @@ export const Plugin = {
       for (const [name, source] of entries) editor.add(name, source)
     })
   }),
-}
+})
 
 function validAlias(name: string) {
   return name.length > 0 && !/[\/\s`,]/.test(name)

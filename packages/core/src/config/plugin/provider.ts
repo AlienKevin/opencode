@@ -1,16 +1,14 @@
 export * as ConfigProviderPlugin from "./provider"
 
+import { define } from "@opencode-ai/plugin/v2/effect"
 import { Effect } from "effect"
-import { Catalog } from "../../catalog"
 import { Config } from "../../config"
-import { Integration } from "../../integration"
 import { ModelV2 } from "../../model"
 import { ModelRequest } from "../../model-request"
-import { PluginV2 } from "../../plugin"
 import { ProviderV2 } from "../../provider"
 
-export const Plugin = PluginV2.define({
-  id: PluginV2.ID.make("config-provider"),
+export const Plugin = define({
+  id: "config-provider",
   effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
     const entries = yield* config.entries()

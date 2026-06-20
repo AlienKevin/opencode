@@ -1,5 +1,6 @@
 export * as ConfigAgentPlugin from "./agent"
 
+import { define } from "@opencode-ai/plugin/v2/effect"
 import path from "path"
 import { Effect, Option, Schema } from "effect"
 import { AgentV2 } from "../../agent"
@@ -8,7 +9,6 @@ import { ConfigAgent } from "../agent"
 import { ConfigMarkdown } from "../markdown"
 import { FSUtil } from "../../fs-util"
 import { ModelV2 } from "../../model"
-import { PluginV2 } from "../../plugin"
 import { ConfigAgentV1 } from "../../v1/config/agent"
 import { ConfigMigrateV1 } from "../../v1/config/migrate"
 
@@ -33,8 +33,8 @@ const agentKeys = new Set([
   "permissions",
 ])
 
-export const Plugin = PluginV2.define({
-  id: PluginV2.ID.make("config-agent"),
+export const Plugin = define({
+  id: "config-agent",
   effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
     const fs = yield* FSUtil.Service

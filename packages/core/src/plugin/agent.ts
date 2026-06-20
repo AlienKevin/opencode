@@ -1,12 +1,11 @@
 export * as AgentPlugin from "./agent"
 
 import path from "path"
+import { define } from "@opencode-ai/plugin/v2/effect"
 import { Effect } from "effect"
 import { AgentV2 } from "../agent"
 import { Global } from "../global"
-import { Location } from "../location"
 import { PermissionV2 } from "../permission"
-import { PluginV2 } from "../plugin"
 
 const TRUNCATION_GLOB = path.join(Global.Path.data, "tool-output", "*")
 const BUILD_SYSTEM =
@@ -97,8 +96,8 @@ Rules:
 - If the conversation ends with an unanswered question to the user, preserve that exact question
 - If the conversation ends with an imperative statement or request to the user (e.g. "Now please run the command and paste the console output"), always include that exact request in the summary`
 
-export const Plugin = PluginV2.define({
-  id: PluginV2.ID.make("agent"),
+export const Plugin = define({
+  id: "agent",
   effect: Effect.fn(function* (ctx) {
     const worktree = ctx.location.directory
     const whitelistedDirs = [TRUNCATION_GLOB, path.join(Global.Path.tmp, "*")]

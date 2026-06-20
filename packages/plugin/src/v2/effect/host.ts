@@ -1,4 +1,5 @@
 import type { Agent } from "./agent.js"
+import type { AISDK } from "./aisdk.js"
 import type { Catalog } from "./catalog.js"
 import type { Command } from "./command.js"
 import type { Event } from "./event.js"
@@ -12,6 +13,7 @@ import type { Skill } from "./skill.js"
 
 export interface PluginHost {
   readonly agent: Agent
+  readonly aisdk: AISDK
   readonly catalog: Catalog
   readonly command: Command
   readonly event: Event

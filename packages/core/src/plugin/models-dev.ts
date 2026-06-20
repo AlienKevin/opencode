@@ -1,9 +1,8 @@
+import { define } from "@opencode-ai/plugin/v2/effect"
 import { Effect, Stream } from "effect"
-import { Catalog } from "../catalog"
 import { ModelV2 } from "../model"
 import { ModelRequest } from "../model-request"
 import { ModelsDev } from "../models-dev"
-import { PluginV2 } from "../plugin"
 import { ProviderV2 } from "../provider"
 
 function released(date: string) {
@@ -49,8 +48,8 @@ function variants(model: ModelsDev.Model, packageName?: string) {
   })
 }
 
-export const ModelsDevPlugin = PluginV2.define({
-  id: PluginV2.ID.make("models-dev"),
+export const ModelsDevPlugin = define({
+  id: "models-dev",
   effect: Effect.fn(function* (ctx) {
     const modelsDev = yield* ModelsDev.Service
     yield* ctx.integration.transform(

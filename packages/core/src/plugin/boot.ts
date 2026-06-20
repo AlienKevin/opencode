@@ -1,5 +1,6 @@
 export * as PluginBoot from "./boot"
 
+import type { LanguageModelV3 } from "@ai-sdk/provider"
 import type { Plugin as PublicPlugin, PluginHost } from "@opencode-ai/plugin/v2/effect"
 import type {
   AgentV2Info,
@@ -47,29 +48,23 @@ type PublicIntegrationMethod = ReturnType<PublicIntegrationDraft["method"]["list
 type PublicSkillDraft = Parameters<Parameters<PluginHost["skill"]["transform"]>[0]>[0]
 type PublicSkillSource = Parameters<PublicSkillDraft["source"]>[0]
 type EventMap = { [Item in SDKEvent as Item["type"]]: Item }
+type PublicSDKHook = (event: {
+  readonly model: ModelV2Info
+  readonly package: string
+  readonly options: Record<string, any>
+  sdk?: any
+}) => Effect.Effect<void> | void
+type PublicLanguageHook = (event: {
+  readonly model: ModelV2Info
+  readonly sdk: any
+  readonly options: Record<string, any>
+  language?: LanguageModelV3
+}) => Effect.Effect<void> | void
 
-type InternalPlugin = {
-  id: PluginV2.ID
-  effect: PluginV2.Effect<
-    | Catalog.Service
-    | CommandV2.Service
-    | Integration.Service
-    | AgentV2.Service
-    | Npm.Service
-    | EventV2.Service
-    | FSUtil.Service
-    | FileSystem.Service
-    | Global.Service
-    | Location.Service
-    | Config.Service
-    | ModelsDev.Service
-    | SkillV2.Service
-    | Reference.Service
-  >
-}
+type InternalPlugin = PublicPlugin<any>
 
 export interface Interface {
-  readonly add: (plugin: PublicPlugin) => Effect.Effect<void>
+  readonly add: (plugin: PublicPlugin<any>) => Effect.Effect<void>
   readonly wait: () => Effect.Effect<void>
 }
 
@@ -104,6 +99,38 @@ export const layer = Layer.effect(
           agents.all().pipe(Effect.map((items) => items.map((value) => encode<AgentV2Info>(AgentV2.Info, value)))),
         rebuild: agents.rebuild,
         transform: (callback) => agents.transform((draft) => callback(agentDraft(draft))),
+      },
+      aisdk: {
+        hook: (name, callback) => {
+          if (name === "sdk") {
+            const run = callback as PublicSDKHook
+            return plugin.hook("aisdk.sdk", (event) => {
+              const output = {
+                model: encode<ModelV2Info>(ModelV2.Info, event.model),
+                package: event.package,
+                options: event.options,
+                sdk: event.sdk,
+              }
+              const result = run(output)
+              return Effect.suspend(() => (Effect.isEffect(result) ? result : Effect.void)).pipe(
+                Effect.tap(() => Effect.sync(() => (event.sdk = output.sdk))),
+              )
+            })
+          }
+          const run = callback as PublicLanguageHook
+          return plugin.hook("aisdk.language", (event) => {
+            const output = {
+              model: encode<ModelV2Info>(ModelV2.Info, event.model),
+              sdk: event.sdk,
+              options: event.options,
+              language: event.language,
+            }
+            const result = run(output)
+            return Effect.suspend(() => (Effect.isEffect(result) ? result : Effect.void)).pipe(
+              Effect.tap(() => Effect.sync(() => (event.language = output.language))),
+            )
+          })
+        },
       },
       catalog: {
         provider: {
@@ -204,25 +231,26 @@ export const layer = Layer.effect(
     const done = yield* Deferred.make<void>()
 
     const add = Effect.fn("PluginBoot.add")(function* (input: InternalPlugin) {
-      const executable = typeof input.effect === "function" ? input.effect(host) : input.effect
       yield* plugin.add({
         id: input.id,
-        effect: executable.pipe(
-          Effect.provideService(Catalog.Service, catalog),
-          Effect.provideService(CommandV2.Service, commands),
-          Effect.provideService(Integration.Service, integration),
-          Effect.provideService(AgentV2.Service, agents),
-          Effect.provideService(Config.Service, config),
-          Effect.provideService(Location.Service, location),
-          Effect.provideService(ModelsDev.Service, modelsDev),
-          Effect.provideService(Npm.Service, npm),
-          Effect.provideService(EventV2.Service, events),
-          Effect.provideService(FSUtil.Service, fs),
-          Effect.provideService(FileSystem.Service, filesystem),
-          Effect.provideService(Global.Service, global),
-          Effect.provideService(SkillV2.Service, skill),
-          Effect.provideService(Reference.Service, reference),
-        ),
+        effect: input
+          .effect(host)
+          .pipe(
+            Effect.provideService(Catalog.Service, catalog),
+            Effect.provideService(CommandV2.Service, commands),
+            Effect.provideService(Integration.Service, integration),
+            Effect.provideService(AgentV2.Service, agents),
+            Effect.provideService(Config.Service, config),
+            Effect.provideService(Location.Service, location),
+            Effect.provideService(ModelsDev.Service, modelsDev),
+            Effect.provideService(Npm.Service, npm),
+            Effect.provideService(EventV2.Service, events),
+            Effect.provideService(FSUtil.Service, fs),
+            Effect.provideService(FileSystem.Service, filesystem),
+            Effect.provideService(Global.Service, global),
+            Effect.provideService(SkillV2.Service, skill),
+            Effect.provideService(Reference.Service, reference),
+          ),
       })
     })
 
@@ -252,7 +280,7 @@ export const layer = Layer.effect(
         Deferred.await(done).pipe(
           Effect.andThen(
             plugin.add({
-              id: PluginV2.ID.make(input.id),
+              id: input.id,
               effect: input.effect(host),
             }),
           ),
