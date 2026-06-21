@@ -8,7 +8,6 @@ const themeCount = Object.keys(DEFAULT_THEMES).length
 type TipPart = { text: string; highlight: boolean }
 type TipShortcut = Accessor<string>
 type Shortcuts = {
-  agentCycle: TipShortcut
   childFirst: TipShortcut
   childNext: TipShortcut
   childPrevious: TipShortcut
@@ -98,7 +97,6 @@ export function Tips(props: { api: TuiPluginApi; connected?: boolean }) {
   const theme = useTheme().theme
   const tipOffset = Math.random()
   const shortcuts: Shortcuts = {
-    agentCycle: useCommandShortcut("agent.cycle"),
     childFirst: configShortcut(props.api, "session.child.first"),
     childNext: configShortcut(props.api, "session.child.next"),
     childPrevious: configShortcut(props.api, "session.child.previous"),
@@ -164,7 +162,6 @@ export function Tips(props: { api: TuiPluginApi; connected?: boolean }) {
 const TIPS: Tip[] = [
   "Type {highlight}@{/highlight} followed by a filename to fuzzy search and attach files",
   "Start a message with {highlight}!{/highlight} to run shell commands directly (e.g., {highlight}!ls -la{/highlight})",
-  (shortcuts) => press(shortcuts.agentCycle(), "to cycle between Build and Plan agents"),
   "Use {highlight}/undo{/highlight} to revert the last message and file changes",
   "Use {highlight}/redo{/highlight} to restore previously undone messages and file changes",
   "Run {highlight}/share{/highlight} to create a public link to your conversation at opencode.ai",
@@ -198,7 +195,6 @@ const TIPS: Tip[] = [
   (shortcuts) => press(shortcuts.inputNewline(), "to add newlines in your prompt"),
   (shortcuts) => press(shortcuts.inputClear(), "when typing to clear the input field"),
   (shortcuts) => press(shortcuts.sessionInterrupt(), "to stop the AI mid-response"),
-  "Switch to {highlight}Plan{/highlight} agent to get suggestions without making actual changes",
   "Use {highlight}@agent-name{/highlight} in prompts to invoke specialized subagents",
   (shortcuts) => {
     const items = [

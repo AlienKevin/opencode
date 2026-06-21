@@ -66,8 +66,6 @@ const appBindingCommands = [
   "model.cycle_favorite_reverse",
   "agent.list",
   "mcp.list",
-  "agent.cycle",
-  "agent.cycle.reverse",
   "variant.cycle",
   "variant.list",
   "provider.connect",
@@ -295,7 +293,7 @@ export function AppView(props: AppViewProps) {
         category: "Agent",
         hidden: true,
         run: () => {
-          local.agent.move(1)
+          local.agent.set("build")
         },
       },
       {
@@ -329,7 +327,7 @@ export function AppView(props: AppViewProps) {
         category: "Agent",
         hidden: true,
         run: () => {
-          local.agent.move(-1)
+          local.agent.set("build")
         },
       },
       {
