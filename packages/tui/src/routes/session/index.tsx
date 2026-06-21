@@ -1654,12 +1654,6 @@ function ReasoningPartImpl(props: { last: boolean; part: ReasoningPart; message:
 
 const ReasoningPart = hot(import.meta.url + "#ReasoningPart", ReasoningPartImpl)
 
-const PART_MAPPING = {
-  text: TextPart,
-  tool: ToolPart,
-  reasoning: ReasoningPart,
-}
-
 function ReasoningHeader(props: {
   toggleable: boolean
   open: boolean
@@ -1704,7 +1698,7 @@ function ReasoningHeader(props: {
   )
 }
 
-function TextPart(props: { last: boolean; part: TextPart; message: AssistantMessage }) {
+function TextPartImpl(props: { last: boolean; part: TextPart; message: AssistantMessage }) {
   const ctx = use()
   const { theme, syntax } = useTheme()
   return (
@@ -1725,9 +1719,11 @@ function TextPart(props: { last: boolean; part: TextPart; message: AssistantMess
   )
 }
 
+const TextPart = hot(import.meta.url + "#TextPart", TextPartImpl)
+
 // Pending messages moved to individual tool pending functions
 
-function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMessage }) {
+function ToolPartImpl(props: { last: boolean; part: ToolPart; message: AssistantMessage }) {
   const ctx = use()
   const display = createMemo(() => toolDisplay(props.part.tool))
 
@@ -1804,6 +1800,14 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
       </Switch>
     </Show>
   )
+}
+
+const ToolPart = hot(import.meta.url + "#ToolPart", ToolPartImpl)
+
+const PART_MAPPING = {
+  text: TextPart,
+  tool: ToolPart,
+  reasoning: ReasoningPart,
 }
 
 type ToolProps = {

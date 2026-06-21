@@ -38,15 +38,16 @@ export function hot<P extends Record<string, any>>(id: string, component: Compon
  * must be an absolute file path. Cache-busting via query string forces Bun
  * to re-evaluate the module.
  */
-export async function reloadModule(filePath: string): Promise<boolean> {
+export async function reloadModule(filePath: string, debugLog?: (msg: string) => void): Promise<boolean> {
+  const log = debugLog ?? (() => {})
   try {
+    log(`importing ${filePath}`)
     const url = new URL("file://" + filePath + "?t=" + Date.now())
     const mod = await import(url.href)
-    // The hot() call inside the module will re-register via registerComponent.
-    // If the module doesn't use hot(), we can't reload it — return false.
+    log(`imported successfully, keys: ${Object.keys(mod).join(",")}`)
     return true
   } catch (e) {
-    console.error(`[hmr] failed to reload ${filePath}:`, e)
+    log(`failed to reload ${filePath}: ${e}`)
     return false
   }
 }
@@ -58,6 +59,13 @@ export async function reloadModule(filePath: string): Promise<boolean> {
 export async function startHmrWatcher(srcDir: string): Promise<(() => void) | undefined> {
   if (!process.env.OPENCODE_HMR) return
 
+  const debugLog = (msg: string) => {
+    try {
+      const { appendFileSync } = require("fs")
+      appendFileSync("/tmp/opencode-hmr.log", new Date().toISOString() + " " + msg + "\n")
+    } catch {}
+  }
+
   try {
     const { watch } = await import("fs")
     const { resolve } = await import("path")
@@ -65,21 +73,24 @@ export async function startHmrWatcher(srcDir: string): Promise<(() => void) | un
     const root = resolve(srcDir)
     let debounce: ReturnType<typeof setTimeout> | undefined
 
+    debugLog(`starting watcher on ${root}`)
+
     const w = watch(root, { recursive: true }, (_event, filename) => {
       if (!filename) return
       if (!filename.endsWith(".tsx") && !filename.endsWith(".ts")) return
       const abs = resolve(root, filename)
+      debugLog(`change detected: ${abs}`)
       if (debounce) clearTimeout(debounce)
       debounce = setTimeout(() => {
-        console.log(`[hmr] reloading ${filename}`)
-        void reloadModule(abs)
+        debugLog(`reloading ${abs}`)
+        void reloadModule(abs, debugLog)
       }, 100)
     })
 
-    console.log(`[hmr] watching ${root}`)
+    debugLog(`watcher started`)
     return () => w.close()
   } catch (e) {
-    console.error("[hmr] failed to start watcher:", e)
+    debugLog(`watcher failed: ${e}`)
     return undefined
   }
 }

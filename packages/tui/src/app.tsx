@@ -228,7 +228,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       const pluginRuntime = createPluginRuntime()
 
       // Start HMR file watcher if OPENCODE_HMR is set.
-      const stopHmr = yield* Effect.tryPromise(() => startHmrWatcher(import.meta.dir + "/src")).pipe(
+      const stopHmr = yield* Effect.tryPromise(() => startHmrWatcher(import.meta.dir)).pipe(
         Effect.map((stop) => stop ?? (() => {})),
       )
       if (process.env.OPENCODE_HMR) yield* Effect.addFinalizer(() => Effect.sync(() => stopHmr()))
