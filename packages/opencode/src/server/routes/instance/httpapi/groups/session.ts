@@ -98,6 +98,7 @@ export const SessionPaths = {
   shell: `${root}/:sessionID/shell`,
   revert: `${root}/:sessionID/revert`,
   unrevert: `${root}/:sessionID/unrevert`,
+  retract: `${root}/:sessionID/retract`,
   permissions: `${root}/:sessionID/permissions/:permissionID`,
   deleteMessage: `${root}/:sessionID/message/:messageID`,
   deletePart: `${root}/:sessionID/message/:messageID/part/:partID`,
@@ -417,6 +418,20 @@ export const SessionApi = HttpApi.make("session")
             summary: "Delete message",
             description:
               "Permanently delete a specific message and all of its parts from a session without reverting file changes.",
+          }),
+        ),
+        HttpApiEndpoint.post("retract", SessionPaths.retract, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: Schema.Struct({ messageID: MessageID }),
+          success: described(Schema.Boolean, "Successfully retracted message"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.retract",
+            summary: "Retract message",
+            description:
+              "Remove a message from the session transcript without reverting file changes or interrupting a running response.",
           }),
         ),
         HttpApiEndpoint.delete("deletePart", SessionPaths.deletePart, {

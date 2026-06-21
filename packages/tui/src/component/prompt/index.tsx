@@ -853,6 +853,45 @@ export function Prompt(props: PromptProps) {
     }
   })
 
+  // Claude Code-style: pull the last user message back into the prompt input
+  // box so it can be edited and resubmitted.
+  //   - When idle: reverts the message server-side (removes from transcript +
+  //     rolls back file changes), then loads text into input.
+  //   - When busy: just loads the text into input. Never interrupts the
+  //     running response. The old message stays in the transcript until the
+  //     user deletes it later.
+  function editLastMessage(): boolean {
+    const sessionID = props.sessionID
+    if (!sessionID) return false
+    const sess = sync.session.get(sessionID)
+    const revertMessageID = sess?.revert?.messageID
+    const messages = sync.data.message[sessionID] ?? []
+    const message = messages.findLast((x) => (!revertMessageID || x.id < revertMessageID) && x.role === "user")
+    if (!message) return false
+    const status = sync.data.session_status?.[sessionID]
+    if (status?.type === "idle") {
+      void sdk.client.session.revert({ sessionID, messageID: message.id })
+    } else {
+      void sdk.client.session.retract({ sessionID, messageID: message.id })
+    }
+    const parts = sync.data.part[message.id] ?? []
+    const reconstructed = parts.reduce(
+      (agg, part) => {
+        if (part.type === "text") {
+          if (!part.synthetic) agg.input += part.text
+        }
+        if (part.type === "file") agg.parts.push(part)
+        return agg
+      },
+      { input: "", parts: [] as PromptInfo["parts"] },
+    )
+    input.setText(reconstructed.input)
+    setStore("prompt", reconstructed)
+    restoreExtmarksFromParts(reconstructed.parts)
+    input.gotoBufferEnd()
+    return true
+  }
+
   useBindings(() => {
     return {
       target: inputTarget,
@@ -869,6 +908,14 @@ export function Prompt(props: PromptProps) {
             if (input.cursorOffset !== 0) {
               if (input.scrollY + input.visualCursor.visualRow === 0) input.cursorOffset = 0
               return false
+            }
+
+            // Claude Code-style: empty input + cursor at start → pull the
+            // last user message into the prompt for editing. Never disrupts
+            // a running session (revert only happens when idle, otherwise
+            // just loads the text).
+            if (!input.plainText && props.sessionID) {
+              if (editLastMessage()) return true
             }
 
             const item = history.move(-1, input.plainText)

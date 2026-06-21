@@ -126,6 +126,7 @@ const sessionBindingCommands = [
   "session.toggle.timestamps",
   "session.toggle.thinking",
   "session.toggle.actions",
+  "session.toggle.assistant_metadata",
   "session.toggle.scrollbar",
   "session.toggle.generic_tool_output",
   "session.first",
@@ -161,6 +162,7 @@ const context = createContext<{
   showThinking: () => boolean
   showTimestamps: () => boolean
   showDetails: () => boolean
+  showAssistantMetadata: () => boolean
   showGenericToolOutput: () => boolean
   diffWrapMode: () => "word" | "none"
   providers: () => ReadonlyMap<string, Provider>
@@ -249,7 +251,7 @@ export function Session() {
   const showThinking = createMemo(() => true)
   const [timestamps, setTimestamps] = kv.signal<"hide" | "show">("timestamps", "hide")
   const [showDetails, setShowDetails] = kv.signal("tool_details_visibility", true)
-  const [showAssistantMetadata, _setShowAssistantMetadata] = kv.signal("assistant_metadata_visibility", true)
+  const [showAssistantMetadata, setShowAssistantMetadata] = kv.signal("assistant_metadata_visibility", false)
   const [showScrollbar, setShowScrollbar] = kv.signal("scrollbar_visible", false)
   const [diffWrapMode] = kv.signal<"word" | "none">("diff_wrap_mode", "word")
   const [_animationsEnabled, _setAnimationsEnabled] = kv.signal("animations_enabled", true)
@@ -697,6 +699,7 @@ export function Session() {
       title: (() => {
         const next = nextThinkingMode(thinkingMode())
         if (next === "hide") return "Collapse thinking"
+        if (next === "minimal") return "Minimal thinking (hide when done)"
         return "Expand thinking"
       })(),
       value: "session.toggle.thinking",
@@ -716,6 +719,15 @@ export function Session() {
       category: "Session",
       run: () => {
         setShowDetails((prev) => !prev)
+        dialog.clear()
+      },
+    },
+    {
+      title: showAssistantMetadata() ? "Hide assistant metadata" : "Show assistant metadata",
+      value: "session.toggle.assistant_metadata",
+      category: "Session",
+      run: () => {
+        setShowAssistantMetadata((prev) => !prev)
         dialog.clear()
       },
     },
@@ -1150,6 +1162,7 @@ export function Session() {
           showThinking,
           showTimestamps,
           showDetails,
+          showAssistantMetadata,
           showGenericToolOutput,
           diffWrapMode,
           providers,
@@ -1539,7 +1552,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
         </box>
       </Show>
       <Switch>
-        <Match when={props.last || final() || props.message.error?.name === "MessageAbortedError"}>
+        <Match when={ctx.showAssistantMetadata() && (props.last || final() || props.message.error?.name === "MessageAbortedError")}>
           <box ref={(el: BoxRenderable) => alwaysSeparate.add(el)} paddingLeft={3}>
             <text marginTop={1}>
               <span
@@ -1590,7 +1603,8 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
   // Reasoning is finalized when the server sets `time.end` (see processor.ts).
   // Flips independently of the parent message completing.
   const isDone = createMemo(() => props.part.time.end !== undefined)
-  const inMinimal = createMemo(() => ctx.thinkingMode() === "hide")
+  const inHide = createMemo(() => ctx.thinkingMode() === "hide")
+  const isMinimal = createMemo(() => ctx.thinkingMode() === "minimal")
   const duration = createMemo(() => {
     const end = props.part.time.end
     return end === undefined ? 0 : Math.max(0, end - props.part.time.start)
@@ -1599,9 +1613,13 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
   const syntax = createSyntaxStyleMemo(() => generateSubtleSyntax(theme))
 
   const toggle = () => {
-    if (!inMinimal()) return
+    if (!inHide()) return
     setExpanded((prev) => !prev)
   }
+
+  // In minimal mode, only show the thinking spinner while in progress.
+  // Once done, render nothing — no collapsed indicator, no body.
+  if (isMinimal() && isDone()) return null
 
   return (
     <Show when={content()}>
@@ -1614,15 +1632,15 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
       >
         <box onMouseUp={toggle}>
           <ReasoningHeader
-            toggleable={inMinimal()}
-            open={!inMinimal() || expanded()}
+            toggleable={inHide()}
+            open={!inHide() || expanded()}
             done={isDone()}
             title={summary().title}
             duration={isDone() ? Locale.duration(duration()) : undefined}
           />
         </box>
-        <Show when={(!inMinimal() || expanded()) && summary().body}>
-          <box paddingLeft={inMinimal() ? 2 : 0} marginTop={1}>
+        <Show when={(!inHide() || expanded()) && summary().body}>
+          <box paddingLeft={inHide() ? 2 : 0} marginTop={1}>
             <code
               filetype="markdown"
               drawUnstyledText={false}

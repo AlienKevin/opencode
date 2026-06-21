@@ -1,9 +1,9 @@
 import { createMemo, type Setter } from "solid-js"
 import { useKV } from "./kv"
 
-export type ThinkingMode = "show" | "hide"
+export type ThinkingMode = "show" | "hide" | "minimal"
 
-const MODES: readonly ThinkingMode[] = ["show", "hide"] as const
+const MODES: readonly ThinkingMode[] = ["show", "hide", "minimal"] as const
 
 // OpenAI's Responses API surfaces reasoning summaries that start with a bolded
 // title block: "**Inspecting PR workflow**\n\n<body>". Treat that first block,
@@ -20,7 +20,7 @@ export function isThinkingMode(value: unknown): value is ThinkingMode {
   return typeof value === "string" && (MODES as readonly string[]).includes(value)
 }
 
-// Cycle order matches the slash command: show → hide → show.
+// Cycle order matches the slash command: show → hide → minimal → show.
 export function nextThinkingMode(current: ThinkingMode): ThinkingMode {
   const idx = MODES.indexOf(current)
   return MODES[(idx + 1) % MODES.length] ?? "show"

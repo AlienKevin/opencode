@@ -392,6 +392,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return true
     })
 
+    const retract = Effect.fn("SessionHttpApi.retract")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: { messageID: MessageID }
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      yield* session.removeMessage({ sessionID: ctx.params.sessionID, messageID: ctx.payload.messageID })
+      return true
+    })
+
     const updatePart = Effect.fn("SessionHttpApi.updatePart")(function* (ctx: {
       params: { sessionID: SessionID; messageID: MessageID; partID: PartID }
       payload: typeof SessionV1.Part.Type
@@ -434,6 +443,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("unrevert", unrevert)
       .handle("permissionRespond", permissionRespond)
       .handle("deleteMessage", deleteMessage)
+      .handle("retract", retract)
       .handle("deletePart", deletePart)
       .handle("updatePart", updatePart)
   }),

@@ -8475,6 +8475,42 @@ export type PermissionRespondResponses = {
 
 export type PermissionRespondResponse = PermissionRespondResponses[keyof PermissionRespondResponses]
 
+export type SessionRetractData = {
+  body?: {
+    messageID: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/retract"
+}
+
+export type SessionRetractErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionRetractError = SessionRetractErrors[keyof SessionRetractErrors]
+
+export type SessionRetractResponses = {
+  /**
+   * Successfully retracted message
+   */
+  200: boolean
+}
+
+export type SessionRetractResponse = SessionRetractResponses[keyof SessionRetractResponses]
+
 export type PartDeleteData = {
   body?: never
   path: {
