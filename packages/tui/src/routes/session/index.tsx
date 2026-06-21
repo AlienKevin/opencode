@@ -81,6 +81,7 @@ import { DialogRetryAction } from "../../component/dialog-retry-action"
 import { getRevertDiffFiles } from "../../util/revert-diff"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
 import { PathFormatterProvider, usePathFormatter } from "../../context/path-format"
+import { hot } from "../../hmr"
 
 addDefaultParsers(parsers.parsers)
 
@@ -1581,15 +1582,9 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
   )
 }
 
-const PART_MAPPING = {
-  text: TextPart,
-  tool: ToolPart,
-  reasoning: ReasoningPart,
-}
-
 const INLINE_TOOL_ICON_WIDTH = 2
 
-function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: AssistantMessage }) {
+function ReasoningPartImpl(props: { last: boolean; part: ReasoningPart; message: AssistantMessage }) {
   const { theme } = useTheme()
   const ctx = use()
   // Collapsed by default in hide mode: a single line throughout, so the
@@ -1655,6 +1650,14 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
       </box>
     </Show>
   )
+}
+
+const ReasoningPart = hot(import.meta.url + "#ReasoningPart", ReasoningPartImpl)
+
+const PART_MAPPING = {
+  text: TextPart,
+  tool: ToolPart,
+  reasoning: ReasoningPart,
 }
 
 function ReasoningHeader(props: {

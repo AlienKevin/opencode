@@ -3,6 +3,7 @@ import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
+import { startHmrWatcher } from "./hmr"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
@@ -225,6 +226,12 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       )
       renderer.once("destroy", () => Deferred.doneUnsafe(shutdown, Effect.void))
       const pluginRuntime = createPluginRuntime()
+
+      // Start HMR file watcher if OPENCODE_HMR is set.
+      const stopHmr = yield* Effect.tryPromise(() => startHmrWatcher(import.meta.dir + "/src")).pipe(
+        Effect.map((stop) => stop ?? (() => {})),
+      )
+      if (process.env.OPENCODE_HMR) yield* Effect.addFinalizer(() => Effect.sync(() => stopHmr()))
 
       yield* Effect.tryPromise(async () => {
         // Prewarm palette before ThemeProvider mounts so `system` theme avoids a first-paint fallback flash.
