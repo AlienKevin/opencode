@@ -81,7 +81,6 @@ import { DialogRetryAction } from "../../component/dialog-retry-action"
 import { getRevertDiffFiles } from "../../util/revert-diff"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
 import { PathFormatterProvider, usePathFormatter } from "../../context/path-format"
-import { hot } from "../../hmr"
 
 addDefaultParsers(parsers.parsers)
 
@@ -1508,6 +1507,8 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                 component={component()}
                 part={part as any}
                 message={props.message}
+                conceal={ctx.conceal}
+                thinkingMode={ctx.thinkingMode}
               />
             </Show>
           )
@@ -1584,9 +1585,14 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
 
 const INLINE_TOOL_ICON_WIDTH = 2
 
-function ReasoningPartImpl(props: { last: boolean; part: ReasoningPart; message: AssistantMessage }) {
+function ReasoningPartImpl(props: {
+  last: boolean
+  part: ReasoningPart
+  message: AssistantMessage
+  conceal: () => boolean
+  thinkingMode: () => ThinkingMode
+}) {
   const { theme } = useTheme()
-  const ctx = use()
   // Collapsed by default in hide mode: a single line throughout, so the
   // layout never shifts. Click to open the full markdown block, click to close.
   const [expanded, setExpanded] = createSignal(false)
@@ -1598,8 +1604,8 @@ function ReasoningPartImpl(props: { last: boolean; part: ReasoningPart; message:
   // Reasoning is finalized when the server sets `time.end` (see processor.ts).
   // Flips independently of the parent message completing.
   const isDone = createMemo(() => props.part.time.end !== undefined)
-  const inHide = createMemo(() => ctx.thinkingMode() === "hide")
-  const isMinimal = createMemo(() => ctx.thinkingMode() === "minimal")
+  const inHide = createMemo(() => props.thinkingMode() === "hide")
+  const isMinimal = createMemo(() => props.thinkingMode() === "minimal")
   const duration = createMemo(() => {
     const end = props.part.time.end
     return end === undefined ? 0 : Math.max(0, end - props.part.time.start)
@@ -1642,7 +1648,7 @@ function ReasoningPartImpl(props: { last: boolean; part: ReasoningPart; message:
               streaming={true}
               syntaxStyle={syntax()}
               content={summary().body}
-              conceal={ctx.conceal()}
+              conceal={props.conceal()}
               fg={theme.textMuted}
             />
           </box>
@@ -1652,7 +1658,7 @@ function ReasoningPartImpl(props: { last: boolean; part: ReasoningPart; message:
   )
 }
 
-const ReasoningPart = hot(import.meta.url + "#ReasoningPart", ReasoningPartImpl)
+const ReasoningPart = ReasoningPartImpl
 
 function ReasoningHeader(props: {
   toggleable: boolean
@@ -1698,8 +1704,7 @@ function ReasoningHeader(props: {
   )
 }
 
-function TextPartImpl(props: { last: boolean; part: TextPart; message: AssistantMessage }) {
-  const ctx = use()
+function TextPartImpl(props: { last: boolean; part: TextPart; message: AssistantMessage; conceal: () => boolean }) {
   const { theme, syntax } = useTheme()
   return (
     <Show when={props.part.text.trim()}>
@@ -1710,7 +1715,7 @@ function TextPartImpl(props: { last: boolean; part: TextPart; message: Assistant
           internalBlockMode="top-level"
           content={props.part.text.trim()}
           tableOptions={{ style: "grid" }}
-          conceal={ctx.conceal()}
+          conceal={props.conceal()}
           fg={theme.markdownText}
           bg={theme.background}
         />
@@ -1719,7 +1724,7 @@ function TextPartImpl(props: { last: boolean; part: TextPart; message: Assistant
   )
 }
 
-const TextPart = hot(import.meta.url + "#TextPart", TextPartImpl)
+const TextPart = TextPartImpl
 
 // Pending messages moved to individual tool pending functions
 
@@ -1802,7 +1807,7 @@ function ToolPartImpl(props: { last: boolean; part: ToolPart; message: Assistant
   )
 }
 
-const ToolPart = hot(import.meta.url + "#ToolPart", ToolPartImpl)
+const ToolPart = ToolPartImpl
 
 const PART_MAPPING = {
   text: TextPart,
