@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { reasoningSummary } from "../../../src/context/thinking"
+import { nextThinkingMode, reasoningSummary } from "../../../src/context/thinking"
 
 describe("reasoningSummary", () => {
   test("extracts a leading summary title and leaves markdown body", () => {
@@ -32,5 +32,13 @@ describe("reasoningSummary", () => {
 
   test("leaves content without a leading title in its body", () => {
     expect(reasoningSummary("Details only.")).toEqual({ title: null, body: "Details only." })
+  })
+})
+
+describe("nextThinkingMode", () => {
+  test("cycles through show, hide, and minimal", () => {
+    expect(nextThinkingMode("show")).toBe("hide")
+    expect(nextThinkingMode("hide")).toBe("minimal")
+    expect(nextThinkingMode("minimal")).toBe("show")
   })
 })

@@ -46,6 +46,7 @@ import { useEditorContext } from "../../context/editor"
 import { openEditor } from "../../editor"
 import { useDialog } from "../../ui/dialog"
 import { DialogAlert } from "../../ui/dialog-alert"
+import { DialogSelect, type DialogSelectOption } from "../../ui/dialog-select"
 import { TodoItem } from "../../component/todo-item"
 import { DialogMessage } from "./dialog-message"
 import type { PromptInfo } from "../../component/prompt/history"
@@ -73,7 +74,7 @@ import { sessionEpilogue } from "../../util/presentation"
 import { setPreLayoutSiblingMargin } from "../../util/layout"
 import { useTuiConfig } from "../../config"
 import { useClipboard } from "../../context/clipboard"
-import { nextThinkingMode, reasoningSummary, useThinkingMode, type ThinkingMode } from "../../context/thinking"
+import { reasoningSummary, useThinkingMode, type ThinkingMode } from "../../context/thinking"
 import { getScrollAcceleration } from "../../util/scroll"
 import { collapseToolOutput } from "../../util/collapse-tool-output"
 import { usePluginRuntime } from "../../plugin/runtime"
@@ -693,22 +694,14 @@ export function Session() {
       },
     },
     {
-      title: (() => {
-        const next = nextThinkingMode(thinkingMode())
-        if (next === "hide") return "Collapse thinking"
-        if (next === "minimal") return "Minimal thinking (hide when done)"
-        return "Expand thinking"
-      })(),
+      title: "Thinking mode",
       value: "session.toggle.thinking",
       category: "Session",
+      description: "Choose how reasoning blocks are shown",
       slash: {
         name: "thinking",
-        aliases: ["toggle-thinking"],
       },
-      run: () => {
-        thinking.set(nextThinkingMode(thinkingMode()))
-        dialog.clear()
-      },
+      run: showThinkingDialog,
     },
     {
       title: showDetails() ? "Hide tool details" : "Show tool details",
@@ -1083,6 +1076,52 @@ export function Session() {
       }),
     },
   ])
+
+  const thinkingOptions = createMemo<DialogSelectOption<ThinkingMode>[]>(() => [
+    {
+      title: "1. Show thinking",
+      value: "show",
+      description: "Display reasoning blocks fully",
+      gutter: () => <text fg={theme.primary}>{thinkingMode() === "show" ? "✔" : " "}</text>,
+      onSelect: (dialog) => {
+        thinking.set("show")
+        dialog.clear()
+      },
+    },
+    {
+      title: "2. Collapse thinking",
+      value: "hide",
+      description: "Show a compact header; click to expand",
+      gutter: () => <text fg={theme.primary}>{thinkingMode() === "hide" ? "✔" : " "}</text>,
+      onSelect: (dialog) => {
+        thinking.set("hide")
+        dialog.clear()
+      },
+    },
+    {
+      title: "3. Minimal thinking (hide when done)",
+      value: "minimal",
+      description: "Show active reasoning, then hide completed blocks",
+      gutter: () => <text fg={theme.primary}>{thinkingMode() === "minimal" ? "✔" : " "}</text>,
+      onSelect: (dialog) => {
+        thinking.set("minimal")
+        dialog.clear()
+      },
+    },
+  ])
+
+  function showThinkingDialog() {
+    dialog.replace(() => (
+      <DialogSelect
+        title="Thinking mode"
+        placeholder="Select thinking mode"
+        options={thinkingOptions()}
+        current={thinkingMode()}
+        renderFilter={false}
+        footerHints={[{ title: "Enter", label: "confirm" }]}
+      />
+    ))
+  }
 
   const sessionCommands = createMemo(() =>
     sessionCommandList().map((command) => ({
@@ -1615,12 +1654,8 @@ function ReasoningPartImpl(props: {
     setExpanded((prev) => !prev)
   }
 
-  // In minimal mode, only show the thinking spinner while in progress.
-  // Once done, render nothing — no collapsed indicator, no body.
-  if (isMinimal() && isDone()) return null
-
   return (
-    <Show when={content()}>
+    <Show when={content() && !(isMinimal() && isDone())}>
       <box
         ref={(el: BoxRenderable) => alwaysSeparate.add(el)}
         paddingLeft={3}
