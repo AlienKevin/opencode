@@ -3,6 +3,7 @@ import { MouseButton } from "@opentui/core"
 import { TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import open from "open"
 import { createEffect, createMemo, createSignal, Match, Show, Switch, type Accessor } from "solid-js"
+import { unwrap } from "solid-js/store"
 import { useClipboard } from "./context/clipboard"
 import { useExit } from "./context/exit"
 import { useKV } from "./context/kv"
@@ -42,6 +43,7 @@ import { useDialog } from "./ui/dialog"
 import { useToast } from "./ui/toast"
 import { isDefaultTitle } from "./util/session"
 import { copy } from "./util/selection"
+import type { PromptInfo } from "./prompt/history"
 
 const appGlobalBindingCommands = [
   "session.list",
@@ -422,7 +424,14 @@ export function AppView(props: AppViewProps) {
         name: "app.restart",
         title: "Restart TUI",
         slashName: "restart",
-        run: () => exit({ type: "restart", route: serializableRoute(route.data) }),
+        run: async () => {
+          const restartRoute = serializableRoute(route.data, promptRef.current?.current)
+          dialog.clear()
+          promptRef.current?.showRestarting?.()
+          renderer.intermediateRender()
+          await new Promise((resolve) => setTimeout(resolve, 120))
+          exit({ type: "restart", route: restartRoute })
+        },
         category: "System",
       },
       {
@@ -620,8 +629,17 @@ export function AppView(props: AppViewProps) {
   )
 }
 
-function serializableRoute(route: Route): Route {
-  if (route.type === "session") return { type: "session", sessionID: route.sessionID }
+export function serializableRoute(route: Route, prompt: PromptInfo | undefined): Route {
+  const draft = serializablePrompt(prompt)
+  if (route.type === "session") return { type: "session", sessionID: route.sessionID, ...(draft ? { prompt: draft } : {}) }
   if (route.type === "plugin") return { type: "plugin", id: route.id }
-  return { type: "home" }
+  return { type: "home", ...(draft ? { prompt: draft } : {}) }
+}
+
+export function serializablePrompt(prompt: PromptInfo | undefined): PromptInfo | undefined {
+  if (!prompt) return
+  const input = prompt.input
+  const parts = structuredClone(unwrap(prompt.parts))
+  if (!input && parts.length === 0) return
+  return { input, parts, ...(prompt.mode ? { mode: prompt.mode } : {}) }
 }

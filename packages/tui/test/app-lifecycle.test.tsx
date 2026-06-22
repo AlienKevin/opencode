@@ -1,4 +1,5 @@
 import { expect, mock, test } from "bun:test"
+import type { CliRendererConfig } from "@opentui/core"
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 import { createTestRenderer } from "@opentui/core/testing"
 import { Effect } from "effect"
@@ -174,6 +175,67 @@ test("app.restart can return without destroying the renderer for exec handoff", 
     expect(setup.renderer.isDestroyed).toBe(false)
     expect(stops).toBe(1)
   } finally {
+    if (!setup.renderer.isDestroyed) setup.renderer.destroy()
+    mock.restore()
+  }
+})
+
+test("restarted app adopts the existing alternate screen", async () => {
+  const setup = await createTestRenderer({ width: 80, height: 24, useThread: false })
+  const core = await import("@opentui/core")
+  let rendererConfig: CliRendererConfig | undefined
+  mock.module("@opentui/core", () => ({
+    ...core,
+    createCliRenderer: async (config?: CliRendererConfig) => {
+      rendererConfig = config
+      return setup.renderer
+    },
+  }))
+  const events = createEventSource()
+  const calls = createFetch()
+  const originalWrite = process.stdout.write.bind(process.stdout)
+  let stdout = ""
+  let api: TuiPluginApi | undefined
+  let started!: () => void
+  const ready = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += String(chunk)
+    return true
+  }) as typeof process.stdout.write
+
+  try {
+    const { run } = await import("../src/app")
+    const task = Effect.runPromise(
+      run({
+        url: "http://test",
+        directory,
+        config: createTuiResolvedConfig({ plugin_enabled: {} }),
+        fetch: calls.fetch,
+        events: events.source,
+        args: {},
+        restart: { adoptAlternateScreen: true },
+        pluginHost: {
+          async start(input) {
+            api = input.api
+            started()
+          },
+          async dispose() {},
+        },
+      }).pipe(Effect.provide(Global.defaultLayer)),
+    )
+
+    await ready
+    await setup.renderOnce()
+    await setup.renderOnce()
+    api?.keymap.dispatchCommand("app.exit")
+
+    expect((await task).type).toBe("exit")
+    expect(rendererConfig?.screenMode).toBe("main-screen")
+    expect(stdout).toContain("\x1b[?1049l")
+  } finally {
+    process.stdout.write = originalWrite
     if (!setup.renderer.isDestroyed) setup.renderer.destroy()
     mock.restore()
   }

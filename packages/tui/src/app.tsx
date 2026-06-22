@@ -65,7 +65,13 @@ export type TuiInput = {
   args: Args
   config: TuiConfig.Resolved
   onSnapshot?: () => Promise<string[]>
-  restart?: { preserveScreen?: boolean }
+  restart?: {
+    preserveScreen?: boolean
+    adoptAlternateScreen?: boolean
+    wasRestarted?: boolean
+    initialRoute?: unknown
+    fastBoot?: boolean
+  }
   directory?: string
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
@@ -131,6 +137,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       const renderer = yield* Effect.acquireRelease(
         Effect.tryPromise(() =>
           createCliRenderer({
+            ...(input.restart?.adoptAlternateScreen ? { screenMode: "main-screen" as const } : {}),
             externalOutputMode: "passthrough",
             targetFps: 60,
             gatherStats: false,
@@ -147,7 +154,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
         (renderer) =>
           Effect.sync(() => {
             if (input.restart?.preserveScreen && isRestartReason(exit.reason)) return
-            destroyRenderer(renderer)
+            destroyRenderer(renderer, { adoptedAlternateScreen: input.restart?.adoptAlternateScreen === true })
           }),
       )
       win32DisableProcessedInput()
@@ -167,13 +174,15 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       )
       yield* Effect.addFinalizer(() => Effect.sync(dispose))
       const shutdown = yield* Deferred.make<unknown>()
-      const onSighup = () => destroyRenderer(renderer)
+      const onSighup = () =>
+        destroyRenderer(renderer, { adoptedAlternateScreen: input.restart?.adoptAlternateScreen === true })
       yield* Effect.acquireRelease(
         Effect.sync(() => process.on("SIGHUP", onSighup)),
         () => Effect.sync(() => process.off("SIGHUP", onSighup)),
       )
       renderer.once("destroy", () => Deferred.doneUnsafe(shutdown, Effect.void))
       const pluginRuntime = createPluginRuntime()
+      const restarted = input.restart?.wasRestarted === true
 
       // Start HMR file watcher for the hot app view boundary.
       const stopHmr = yield* Effect.tryPromise(() => startHmrWatcher({ srcDir: import.meta.dir, roots: hmrRoots })).pipe(
@@ -184,7 +193,9 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       yield* Effect.tryPromise(async () => {
         // Prewarm palette before ThemeProvider mounts so `system` theme avoids a first-paint fallback flash.
         void renderer.getPalette({ size: 16 }).catch(() => undefined)
-        const mode = (await renderer.waitForThemeMode(1000)) ?? "dark"
+        const mode = input.restart?.adoptAlternateScreen
+          ? (renderer.themeMode ?? "dark")
+          : ((await renderer.waitForThemeMode(1000)) ?? "dark")
         if (renderer.isDestroyed) return
 
         await render(() => {
@@ -198,7 +209,10 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                   Deferred.doneUnsafe(shutdown, Effect.void)
                   return
                 }
-                destroyRenderer(renderer, { preserveScreen: isRestartReason(reason) })
+                destroyRenderer(renderer, {
+                  preserveScreen: isRestartReason(reason),
+                  adoptedAlternateScreen: input.restart?.adoptAlternateScreen === true,
+                })
               }}
             >
               <EpilogueProvider set={(value) => (exit.epilogue = value)}>
@@ -224,8 +238,8 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                     >
                       <TuiStartupProvider
                         value={{
-                          initialRoute: process.env.OPENCODE_ROUTE ? JSON.parse(process.env.OPENCODE_ROUTE) : undefined,
-                          skipInitialLoading: Boolean(process.env.OPENCODE_FAST_BOOT),
+                          initialRoute: restarted ? input.restart?.initialRoute : undefined,
+                          skipInitialLoading: restarted && input.restart?.fastBoot === true,
                         }}
                       >
                         <ClipboardProvider>

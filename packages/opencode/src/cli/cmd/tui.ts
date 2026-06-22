@@ -70,7 +70,18 @@ function restartEnvironment(route: Extract<TuiResult, { type: "restart" }>["rout
   env.OPENCODE_FAST_BOOT = "1"
   env.OPENCODE_RESTART = "1"
   env.OPENCODE_ROUTE = JSON.stringify(route)
+  delete env.OPENCODE_ADOPT_ALT_SCREEN
+  delete env.OPENCODE_RESTART_PID
   return env
+}
+
+function restartRoute(value: string | undefined) {
+  if (!value) return
+  try {
+    return JSON.parse(value) as unknown
+  } catch {
+    return
+  }
 }
 
 async function restart(result: Extract<TuiResult, { type: "restart" }>, cwd: string) {
@@ -79,6 +90,8 @@ async function restart(result: Extract<TuiResult, { type: "restart" }>, cwd: str
   process.chdir(cwd)
   const execve = Reflect.get(process, "execve")
   if (typeof execve === "function") {
+    env.OPENCODE_ADOPT_ALT_SCREEN = "1"
+    env.OPENCODE_RESTART_PID = String(process.pid)
     execve.call(process, process.execPath, argv, env)
     throw new Error("process.execve returned unexpectedly")
   }
@@ -148,8 +161,17 @@ export const TuiThreadCommand = cmd({
     }
     try {
       const { TuiConfig } = await import("@/config/tui")
-      const restarted = process.env.OPENCODE_RESTART === "1"
+      const restartPID = process.env.OPENCODE_RESTART_PID
+      const restarted = process.env.OPENCODE_RESTART === "1" && (!restartPID || restartPID === String(process.pid))
+      const initialRoute = restarted ? restartRoute(process.env.OPENCODE_ROUTE) : undefined
+      const fastBoot = restarted && process.env.OPENCODE_FAST_BOOT === "1"
+      const adoptAlternateScreen = restarted && process.env.OPENCODE_ADOPT_ALT_SCREEN === "1"
       const execRestart = typeof Reflect.get(process, "execve") === "function"
+      delete process.env.OPENCODE_ADOPT_ALT_SCREEN
+      delete process.env.OPENCODE_FAST_BOOT
+      delete process.env.OPENCODE_RESTART
+      delete process.env.OPENCODE_RESTART_PID
+      delete process.env.OPENCODE_ROUTE
       if (args.fork && !args.continue && !args.session) {
         UI.error("--fork requires --continue or --session")
         process.exitCode = 1
@@ -241,7 +263,7 @@ export const TuiThreadCommand = cmd({
               return [tui, server]
             },
             config,
-            restart: { preserveScreen: execRestart },
+            restart: { preserveScreen: execRestart, adoptAlternateScreen, wasRestarted: restarted, initialRoute, fastBoot },
             pluginHost: createLegacyTuiPluginHost(),
             directory: cwd,
             fetch: transport.fetch,

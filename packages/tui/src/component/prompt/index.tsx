@@ -90,6 +90,7 @@ export type PromptRef = {
   reset(): void
   blur(): void
   focus(): void
+  showRestarting?(): void
   submit(): void
 }
 
@@ -204,6 +205,7 @@ export function Prompt(props: PromptProps) {
   const workspace = usePromptWorkspace(props.sessionID)
   const move = usePromptMove({ projectID: project.project, sessionID: () => props.sessionID })
   const [cursorVersion, setCursorVersion] = createSignal(0)
+  const [restarting, setRestarting] = createSignal(false)
   const currentProviderLabel = createMemo(() => local.model.parsed().provider)
   const hasRightContent = createMemo(() => Boolean(props.right))
 
@@ -576,6 +578,10 @@ export function Prompt(props: PromptProps) {
       return input.focused
     },
     get current() {
+      if (input && !input.isDestroyed && input.plainText !== store.prompt.input) {
+        setStore("prompt", "input", input.plainText)
+        syncExtmarksWithPromptParts()
+      }
       return store.prompt
     },
     focus() {
@@ -587,6 +593,7 @@ export function Prompt(props: PromptProps) {
     set(prompt) {
       input.setText(prompt.input)
       setStore("prompt", prompt)
+      if (prompt.mode) setStore("mode", prompt.mode)
       restoreExtmarksFromParts(prompt.parts)
       input.gotoBufferEnd()
     },
@@ -601,6 +608,11 @@ export function Prompt(props: PromptProps) {
     },
     submit() {
       void submit()
+    },
+    showRestarting() {
+      if (!input || input.isDestroyed) return
+      setRestarting(true)
+      renderer.requestRender()
     },
   }
 
@@ -1534,6 +1546,11 @@ export function Prompt(props: PromptProps) {
         </box>
         <box width="100%" flexDirection="row" justifyContent="space-between">
           <Switch>
+            <Match when={restarting()}>
+              <box paddingLeft={3}>
+                <Spinner color={theme.accent}>Restarting session...</Spinner>
+              </box>
+            </Match>
             <Match when={status().type !== "idle"}>
               <box
                 flexDirection="row"

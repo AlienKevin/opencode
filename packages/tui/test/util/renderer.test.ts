@@ -49,3 +49,27 @@ test("can preserve the screen during renderer destruction", () => {
   expect(renderer.clearOnShutdown).toBe(false)
   expect(calls).toEqual([["renderer", false]])
 })
+
+test("leaves an adopted alternate screen after renderer destruction", () => {
+  const originalWrite = process.stdout.write.bind(process.stdout)
+  let stdout = ""
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += String(chunk)
+    return true
+  }) as typeof process.stdout.write
+
+  try {
+    destroyRenderer(
+      {
+        isDestroyed: false,
+        setTerminalTitle() {},
+        destroy() {},
+      },
+      { adoptedAlternateScreen: true },
+    )
+
+    expect(stdout).toBe("\x1b[?1049l")
+  } finally {
+    process.stdout.write = originalWrite
+  }
+})

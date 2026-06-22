@@ -1,13 +1,16 @@
 import type { CliRenderer } from "@opentui/core"
 
+const SWITCH_TO_MAIN_SCREEN = "\x1b[?1049l"
+
 export function destroyRenderer(
   renderer: Pick<CliRenderer, "isDestroyed" | "setTerminalTitle" | "destroy">,
-  options: { preserveScreen?: boolean } = {},
+  options: { preserveScreen?: boolean; adoptedAlternateScreen?: boolean } = {},
 ) {
   renderer.setTerminalTitle("")
   if (renderer.isDestroyed) return
   if (options.preserveScreen) setClearOnShutdown(renderer, false)
   renderer.destroy()
+  if (options.adoptedAlternateScreen) process.stdout.write(SWITCH_TO_MAIN_SCREEN)
 }
 
 function setClearOnShutdown(renderer: object, clear: boolean) {

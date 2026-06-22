@@ -41,15 +41,24 @@ export const { use: useRoute, provider: RouteProvider } = createSimpleContext({
   },
 })
 
-function initialRoute(value: unknown): Route | undefined {
+export function initialRoute(value: unknown): Route | undefined {
   if (!value || typeof value !== "object" || !("type" in value)) return
-  if (value.type === "home") return { type: "home" }
+  const prompt = "prompt" in value ? initialPrompt(value.prompt) : undefined
+  if (value.type === "home") return { type: "home", ...(prompt ? { prompt } : {}) }
   if (value.type === "session" && "sessionID" in value && typeof value.sessionID === "string") {
-    return { type: "session", sessionID: value.sessionID }
+    return { type: "session", sessionID: value.sessionID, ...(prompt ? { prompt } : {}) }
   }
   if (value.type === "plugin" && "id" in value && typeof value.id === "string") {
     return { type: "plugin", id: value.id }
   }
+}
+
+function initialPrompt(value: unknown): PromptInfo | undefined {
+  if (!value || typeof value !== "object") return
+  if (!("input" in value) || typeof value.input !== "string") return
+  if (!("parts" in value) || !Array.isArray(value.parts)) return
+  const mode = "mode" in value && (value.mode === "normal" || value.mode === "shell") ? value.mode : undefined
+  return { input: value.input, parts: value.parts as PromptInfo["parts"], ...(mode ? { mode } : {}) }
 }
 
 export type RouteContext = ReturnType<typeof useRoute>
