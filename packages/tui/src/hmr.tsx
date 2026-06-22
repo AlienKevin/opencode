@@ -136,8 +136,6 @@ export async function reloadHotRoots(options: HmrOptions) {
 }
 
 export async function startHmrWatcher(options: HmrOptions): Promise<(() => void) | undefined> {
-  if (!process.env.OPENCODE_HMR) return
-
   const debugLog = options.debugLog ?? ((message: string) => writeDebugLog(message))
   const reloader = createHmrReloader({ ...options, debugLog })
 

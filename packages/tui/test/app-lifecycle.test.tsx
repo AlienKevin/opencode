@@ -125,3 +125,56 @@ test("app.exit prints the session epilogue after scoped cleanup", async () => {
     mock.restore()
   }
 })
+
+test("app.restart can return without destroying the renderer for exec handoff", async () => {
+  const setup = await createTestRenderer({ width: 80, height: 24, useThread: false })
+  const core = await import("@opentui/core")
+  mock.module("@opentui/core", () => ({ ...core, createCliRenderer: async () => setup.renderer }))
+  const events = createEventSource()
+  const calls = createFetch()
+  let api: TuiPluginApi | undefined
+  let started!: () => void
+  const ready = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const stop = setup.renderer.stop.bind(setup.renderer)
+  let stops = 0
+  setup.renderer.stop = () => {
+    stops++
+    stop()
+  }
+
+  try {
+    const { run } = await import("../src/app")
+    const task = Effect.runPromise(
+      run({
+        url: "http://test",
+        directory,
+        config: createTuiResolvedConfig({ plugin_enabled: {} }),
+        fetch: calls.fetch,
+        events: events.source,
+        args: {},
+        restart: { preserveScreen: true },
+        pluginHost: {
+          async start(input) {
+            api = input.api
+            started()
+          },
+          async dispose() {},
+        },
+      }).pipe(Effect.provide(Global.defaultLayer)),
+    )
+
+    await ready
+    await setup.renderOnce()
+    await setup.renderOnce()
+    api?.keymap.dispatchCommand("app.restart")
+
+    expect((await task).type).toBe("restart")
+    expect(setup.renderer.isDestroyed).toBe(false)
+    expect(stops).toBe(1)
+  } finally {
+    if (!setup.renderer.isDestroyed) setup.renderer.destroy()
+    mock.restore()
+  }
+})

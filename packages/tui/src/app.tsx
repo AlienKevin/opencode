@@ -10,7 +10,7 @@ import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
 import { handleSelectionKey } from "./util/selection"
 import { createCliRenderer } from "@opentui/core"
-import { RouteProvider, useRoute } from "./context/route"
+import { RouteProvider, useRoute, type Route } from "./context/route"
 import {
   createEffect,
   ErrorBoundary,
@@ -55,6 +55,7 @@ import { win32DisableProcessedInput, win32FlushInputBuffer } from "./terminal-wi
 import { destroyRenderer } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
 import { AppView, type AppViewProps } from "./app-view"
+import { isRecord } from "./util/record"
 
 const hmrRoots = [{ id: "app-view.tsx#AppView", file: "app-view.tsx", exportName: "AppView" }] as const
 const HotAppView = hotComponent<AppViewProps>(hmrRoots[0].id, AppView)
@@ -64,11 +65,30 @@ export type TuiInput = {
   args: Args
   config: TuiConfig.Resolved
   onSnapshot?: () => Promise<string[]>
+  restart?: { preserveScreen?: boolean }
   directory?: string
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
   events?: EventSource
   pluginHost: TuiPluginHost
+}
+
+export type TuiResult = { type: "exit" } | { type: "restart"; route: Route }
+
+type TuiRestartReason = { type: "restart"; route: Route }
+
+function isRoute(value: unknown): value is Route {
+  if (!isRecord(value)) return false
+  if (value.type === "home") return true
+  if (value.type === "session") return typeof value.sessionID === "string"
+  if (value.type === "plugin") return typeof value.id === "string"
+  return false
+}
+
+function isRestartReason(reason: unknown): reason is TuiRestartReason {
+  if (!isRecord(reason)) return false
+  if (reason.type !== "restart") return false
+  return isRoute(reason.route)
 }
 
 function errorMessage(error: unknown) {
@@ -126,6 +146,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
         ),
         (renderer) =>
           Effect.sync(() => {
+            if (input.restart?.preserveScreen && isRestartReason(exit.reason)) return
             destroyRenderer(renderer)
           }),
       )
@@ -154,11 +175,11 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       renderer.once("destroy", () => Deferred.doneUnsafe(shutdown, Effect.void))
       const pluginRuntime = createPluginRuntime()
 
-      // Start HMR file watcher if OPENCODE_HMR is set.
+      // Start HMR file watcher for the hot app view boundary.
       const stopHmr = yield* Effect.tryPromise(() => startHmrWatcher({ srcDir: import.meta.dir, roots: hmrRoots })).pipe(
         Effect.map((stop) => stop ?? (() => {})),
       )
-      if (process.env.OPENCODE_HMR) yield* Effect.addFinalizer(() => Effect.sync(() => stopHmr()))
+      yield* Effect.addFinalizer(() => Effect.sync(() => stopHmr()))
 
       yield* Effect.tryPromise(async () => {
         // Prewarm palette before ThemeProvider mounts so `system` theme avoids a first-paint fallback flash.
@@ -172,7 +193,12 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
               exit={(reason) => {
                 if (renderer.isDestroyed) return
                 exit.reason = reason
-                destroyRenderer(renderer)
+                if (input.restart?.preserveScreen && isRestartReason(reason)) {
+                  renderer.stop()
+                  Deferred.doneUnsafe(shutdown, Effect.void)
+                  return
+                }
+                destroyRenderer(renderer, { preserveScreen: isRestartReason(reason) })
               }}
             >
               <EpilogueProvider set={(value) => (exit.epilogue = value)}>
@@ -274,12 +300,16 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       return { epilogue: exit.epilogue, reason: exit.reason }
     }),
   )
+  const output: TuiResult = isRestartReason(result.reason)
+    ? { type: "restart", route: result.reason.route }
+    : { type: "exit" }
   yield* Effect.sync(() => {
     win32FlushInputBuffer()
-    if (result.reason !== undefined)
+    if (output.type === "exit" && result.reason !== undefined)
       process.stderr.write((cliErrorMessage(result.reason) ?? errorFormat(result.reason)) + "\n")
-    if (result.epilogue) process.stdout.write(result.epilogue + "\n")
+    if (output.type === "exit" && result.epilogue) process.stdout.write(result.epilogue + "\n")
   })
+  return output
 })
 
 function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPluginHost }) {

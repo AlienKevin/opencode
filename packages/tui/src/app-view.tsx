@@ -9,7 +9,7 @@ import { useKV } from "./context/kv"
 import { useLocal } from "./context/local"
 import { useProject } from "./context/project"
 import { usePromptRef } from "./context/prompt"
-import { useRoute } from "./context/route"
+import { useRoute, type Route } from "./context/route"
 import { useTuiStartup } from "./context/runtime"
 import { useSync } from "./context/sync"
 import { useTheme } from "./context/theme"
@@ -419,6 +419,13 @@ export function AppView(props: AppViewProps) {
         category: "System",
       },
       {
+        name: "app.restart",
+        title: "Restart TUI",
+        slashName: "restart",
+        run: () => exit({ type: "restart", route: serializableRoute(route.data) }),
+        category: "System",
+      },
+      {
         name: "app.debug",
         title: "Toggle debug panel",
         category: "System",
@@ -611,4 +618,10 @@ export function AppView(props: AppViewProps) {
       </Show>
     </box>
   )
+}
+
+function serializableRoute(route: Route): Route {
+  if (route.type === "session") return { type: "session", sessionID: route.sessionID }
+  if (route.type === "plugin") return { type: "plugin", id: route.id }
+  return { type: "home" }
 }

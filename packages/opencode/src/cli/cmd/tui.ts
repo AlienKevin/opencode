@@ -10,6 +10,7 @@ import { withNetworkOptions, resolveNetworkOptionsNoConfig } from "@/cli/network
 import { Filesystem } from "@/util/filesystem"
 import type { GlobalEvent } from "@opencode-ai/sdk/v2"
 import type { EventSource } from "@opencode-ai/tui/context/sdk"
+import type { TuiResult } from "@opencode-ai/tui"
 import { writeHeapSnapshot } from "v8"
 import { validateSession } from "../tui/validate-session"
 import { win32InstallCtrlCGuard } from "@opencode-ai/tui/terminal-win32"
@@ -62,6 +63,36 @@ async function input(value?: string) {
   return piped + "\n" + value
 }
 
+function restartEnvironment(route: Extract<TuiResult, { type: "restart" }>["route"]) {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+  )
+  env.OPENCODE_FAST_BOOT = "1"
+  env.OPENCODE_RESTART = "1"
+  env.OPENCODE_ROUTE = JSON.stringify(route)
+  return env
+}
+
+async function restart(result: Extract<TuiResult, { type: "restart" }>, cwd: string) {
+  const env = restartEnvironment(result.route)
+  const argv = [process.execPath, ...process.argv.slice(1)]
+  process.chdir(cwd)
+  const execve = Reflect.get(process, "execve")
+  if (typeof execve === "function") {
+    execve.call(process, process.execPath, argv, env)
+    throw new Error("process.execve returned unexpectedly")
+  }
+
+  const proc = Bun.spawn([process.execPath, ...process.argv.slice(1)], {
+    cwd,
+    env,
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  })
+  return proc.exited
+}
+
 export function resolveThreadDirectory(project?: string, envPWD = process.env.PWD, cwd = process.cwd()) {
   const root = Filesystem.resolve(envPWD ?? cwd)
   if (project) return Filesystem.resolve(path.isAbsolute(project) ? project : path.join(root, project))
@@ -105,9 +136,20 @@ export const TuiThreadCommand = cmd({
         describe: "agent to use",
       }),
   handler: async (args) => {
+    const startCwd = Filesystem.resolve(process.cwd())
     const unguard = win32InstallCtrlCGuard()
+    let unguarded = false
+    const cleanupGuard = () => {
+      if (unguarded) return
+      unguarded = true
+      try {
+        unguard?.()
+      } catch {}
+    }
     try {
       const { TuiConfig } = await import("@/config/tui")
+      const restarted = process.env.OPENCODE_RESTART === "1"
+      const execRestart = typeof Reflect.get(process, "execve") === "function"
       if (args.fork && !args.continue && !args.session) {
         UI.error("--fork requires --continue or --session")
         process.exitCode = 1
@@ -142,7 +184,7 @@ export const TuiThreadCommand = cmd({
         worker.terminate()
       }
 
-      const prompt = await input(args.prompt)
+      const prompt = restarted ? undefined : await input(args.prompt)
       const config = await TuiConfig.get()
 
       const network = resolveNetworkOptionsNoConfig(args)
@@ -166,28 +208,31 @@ export const TuiThreadCommand = cmd({
             events: createEventSource(client),
           }
 
-      try {
-        await validateSession({
-          url: transport.url,
-          sessionID: args.session,
-          directory: cwd,
-          fetch: transport.fetch,
-        })
-      } catch (error) {
-        UI.error(errorMessage(error))
-        process.exitCode = 1
-        return
+      if (!restarted) {
+        try {
+          await validateSession({
+            url: transport.url,
+            sessionID: args.session,
+            directory: cwd,
+            fetch: transport.fetch,
+          })
+        } catch (error) {
+          UI.error(errorMessage(error))
+          process.exitCode = 1
+          return
+        }
       }
 
       setTimeout(() => {
         client.call("checkUpgrade", { directory: cwd }).catch(() => {})
       }, 1000).unref?.()
 
+      let result: TuiResult = { type: "exit" }
       try {
         const { Effect } = await import("effect")
         const { run } = await import("../tui/layer")
         const { createLegacyTuiPluginHost } = await import("@/plugin/tui/runtime")
-        await Effect.runPromise(
+        result = await Effect.runPromise(
           run({
             url: transport.url,
             async onSnapshot() {
@@ -196,27 +241,30 @@ export const TuiThreadCommand = cmd({
               return [tui, server]
             },
             config,
+            restart: { preserveScreen: execRestart },
             pluginHost: createLegacyTuiPluginHost(),
             directory: cwd,
             fetch: transport.fetch,
             events: transport.events,
             args: {
-              continue: args.continue,
-              sessionID: args.session,
+              continue: restarted ? false : args.continue,
+              sessionID: restarted ? undefined : args.session,
               agent: args.agent,
               model: args.model,
               prompt,
-              fork: args.fork,
+              fork: restarted ? false : args.fork,
             },
           }),
         )
       } finally {
         await stop()
       }
+      if (result.type === "restart") {
+        cleanupGuard()
+        process.exit(await restart(result, startCwd))
+      }
     } finally {
-      try {
-        unguard?.()
-      } catch {}
+      cleanupGuard()
     }
     process.exit(0)
   },

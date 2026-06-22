@@ -41,7 +41,7 @@ The current TUI HMR system is in `packages/tui/src/hmr.tsx` and is wired in `pac
 
 Key files:
 
-- `packages/tui/src/app.tsx`: stable runtime shell. It creates the renderer, keymap, providers, SDK/plugin runtime, and starts HMR when `OPENCODE_HMR` is set.
+- `packages/tui/src/app.tsx`: stable runtime shell. It creates the renderer, keymap, providers, SDK/plugin runtime, and starts HMR.
 - `packages/tui/src/app-view.tsx`: hot UI boundary exported as `AppView`.
 - `packages/tui/src/hmr.tsx`: `hotComponent`, HMR registry, watcher, module graph copier, relative import rewriter, and fallback behavior.
 - `packages/tui/test/hmr.test.tsx`: automated HMR coverage.
@@ -50,7 +50,7 @@ How it works:
 
 - `app.tsx` defines `hmrRoots = [{ id: "app-view.tsx#AppView", file: "app-view.tsx", exportName: "AppView" }]`.
 - `HotAppView = hotComponent(..., AppView)` renders the registered component signal.
-- `startHmrWatcher({ srcDir: import.meta.dir, roots: hmrRoots })` watches `packages/tui/src` only when `OPENCODE_HMR=1`.
+- `startHmrWatcher({ srcDir: import.meta.dir, roots: hmrRoots })` watches `packages/tui/src`.
 - The watcher reacts to `.ts`, `.tsx`, `.js`, `.jsx`, and `.json` changes and ignores `.opencode-hmr-*` folders.
 - Reload builds a temporary module graph under `packages/tui/src/.opencode-hmr-*`, rewrites relative imports to that graph, imports the root, and swaps the registered component only after a successful import.
 - If reload fails, it logs the error and keeps the previous working UI.
@@ -61,7 +61,7 @@ Manual HMR test:
 
 ```sh
 cd /Users/kevin/Dev/opencode/packages/opencode
-tmux new-session -d -s opencode-hmr 'OPENCODE_HMR=1 bun dev'
+tmux new-session -d -s opencode-hmr 'bun dev'
 tmux capture-pane -pt opencode-hmr
 ```
 

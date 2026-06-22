@@ -28,3 +28,24 @@ test("still clears the title after renderer destruction", () => {
   })
   expect(calls).toEqual(["title:"])
 })
+
+test("can preserve the screen during renderer destruction", () => {
+  const calls: [unknown, boolean][] = []
+  const renderer = {
+    clearOnShutdown: true,
+    rendererPtr: "renderer",
+    lib: {
+      setClearOnShutdown(renderer: unknown, clear: boolean) {
+        calls.push([renderer, clear])
+      },
+    },
+    isDestroyed: false,
+    setTerminalTitle() {},
+    destroy() {},
+  }
+
+  destroyRenderer(renderer, { preserveScreen: true })
+
+  expect(renderer.clearOnShutdown).toBe(false)
+  expect(calls).toEqual([["renderer", false]])
+})
