@@ -1,9 +1,9 @@
 export * as PluginBoot from "./boot"
 
-import { Context, Deferred, Effect, Layer } from "effect"
-import { Credential } from "../credential"
+import { Effect, Layer } from "effect"
 import { Integration } from "../integration"
 import { AgentV2 } from "../agent"
+import { AISDK } from "../aisdk"
 import { Catalog } from "../catalog"
 import { CommandV2 } from "../command"
 import { Config } from "../config"
@@ -11,8 +11,10 @@ import { ConfigAgentPlugin } from "../config/plugin/agent"
 import { ConfigCommandPlugin } from "../config/plugin/command"
 import { ConfigSkillPlugin } from "../config/plugin/skill"
 import { ConfigReferencePlugin } from "../config/plugin/reference"
+import { ConfigExternalPlugin } from "../config/plugin/external"
 import { EventV2 } from "../event"
 import { FSUtil } from "../fs-util"
+import { FileSystem } from "../filesystem"
 import { Global } from "../global"
 import { Location } from "../location"
 import { ModelsDev } from "../models-dev"
@@ -26,42 +28,16 @@ import { ModelsDevPlugin } from "./models-dev"
 import { ProviderPlugins } from "./provider"
 import { SkillV2 } from "../skill"
 import { Reference } from "../reference"
+import { State } from "../state"
+import { PluginHost } from "./host"
+import { PluginInternal } from "./internal"
 
-type Plugin = {
-  id: PluginV2.ID
-  effect: PluginV2.Effect<
-    | Catalog.Service
-    | CommandV2.Service
-    | Credential.Service
-    | Integration.Service
-    | AgentV2.Service
-    | Npm.Service
-    | EventV2.Service
-    | FSUtil.Service
-    | Global.Service
-    | Location.Service
-    | PluginV2.Service
-    | Config.Service
-    | ModelsDev.Service
-    | SkillV2.Service
-    | Reference.Service
-  >
-}
-
-export interface Interface {
-  readonly wait: () => Effect.Effect<void>
-}
-
-export class Service extends Context.Service<Service, Interface>()("@opencode/v2/PluginBoot") {}
-
-export const layer = Layer.effect(
-  Service,
+export const locationLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const catalog = yield* Catalog.Service
     const commands = yield* CommandV2.Service
     const plugin = yield* PluginV2.Service
-    const credentials = yield* Credential.Service
-    const integrations = yield* Integration.Service
+    const integration = yield* Integration.Service
     const agents = yield* AgentV2.Service
     const config = yield* Config.Service
     const location = yield* Location.Service
@@ -69,19 +45,19 @@ export const layer = Layer.effect(
     const npm = yield* Npm.Service
     const events = yield* EventV2.Service
     const fs = yield* FSUtil.Service
+    const filesystem = yield* FileSystem.Service
     const global = yield* Global.Service
     const skill = yield* SkillV2.Service
-    const references = yield* Reference.Service
-    const done = yield* Deferred.make<void>()
+    const reference = yield* Reference.Service
+    const host = yield* PluginHost.make(plugin)
 
-    const add = Effect.fn("PluginBoot.add")(function* (input: Plugin) {
-      yield* plugin.add({
-        id: input.id,
-        effect: input.effect.pipe(
+    const add = <R>(input: PluginInternal.Plugin<R>) =>
+      input
+        .effect({ ...host, options: {} })
+        .pipe(
           Effect.provideService(Catalog.Service, catalog),
           Effect.provideService(CommandV2.Service, commands),
-          Effect.provideService(Credential.Service, credentials),
-          Effect.provideService(Integration.Service, integrations),
+          Effect.provideService(Integration.Service, integration),
           Effect.provideService(AgentV2.Service, agents),
           Effect.provideService(Config.Service, config),
           Effect.provideService(Location.Service, location),
@@ -89,42 +65,31 @@ export const layer = Layer.effect(
           Effect.provideService(Npm.Service, npm),
           Effect.provideService(EventV2.Service, events),
           Effect.provideService(FSUtil.Service, fs),
+          Effect.provideService(FileSystem.Service, filesystem),
           Effect.provideService(Global.Service, global),
           Effect.provideService(SkillV2.Service, skill),
-          Effect.provideService(Reference.Service, references),
-          Effect.provideService(PluginV2.Service, plugin),
-        ),
-      })
-    })
+          Effect.provideService(Reference.Service, reference),
+        )
 
-    const boot = Effect.gen(function* () {
-      yield* add(AgentPlugin.Plugin)
-      yield* add(CommandPlugin.Plugin)
-      yield* add(SkillPlugin.Plugin)
-      for (const item of ProviderPlugins) {
-        yield* add(item)
-      }
-      yield* add(ModelsDevPlugin)
-      yield* add(ConfigProviderPlugin.Plugin)
-      yield* add(ConfigAgentPlugin.Plugin)
-      yield* add(ConfigCommandPlugin.Plugin)
-      yield* add(ConfigSkillPlugin.Plugin)
-      yield* add(ConfigReferencePlugin.Plugin)
-    }).pipe(Effect.withSpan("PluginBoot.boot"))
-
-    yield* boot.pipe(
-      Effect.exit,
-      Effect.flatMap((exit) => Deferred.done(done, exit)),
-      Effect.forkScoped,
-    )
-
-    return Service.of({
-      wait: () => Deferred.await(done),
-    })
+    yield* State.batch(
+      Effect.gen(function* () {
+        yield* add(AgentPlugin.Plugin)
+        yield* add(CommandPlugin.Plugin)
+        yield* add(SkillPlugin.Plugin)
+        yield* add(ModelsDevPlugin)
+        yield* add(ConfigProviderPlugin.Plugin)
+        yield* add(ConfigAgentPlugin.Plugin)
+        yield* add(ConfigCommandPlugin.Plugin)
+        yield* add(ConfigSkillPlugin.Plugin)
+        yield* add(ConfigReferencePlugin.Plugin)
+        for (const item of ProviderPlugins) yield* add(item)
+        yield* add(ConfigExternalPlugin.Plugin)
+      }),
+    ).pipe(Effect.withSpan("PluginBoot.boot"))
   }),
-)
-
-export const locationLayer = layer.pipe(
+).pipe(
+  Layer.provideMerge(PluginV2.locationLayer),
+  Layer.provideMerge(AISDK.locationLayer),
   Layer.provideMerge(Integration.locationLayer),
   Layer.provideMerge(Catalog.locationLayer),
   Layer.provideMerge(CommandV2.locationLayer),
@@ -132,4 +97,5 @@ export const locationLayer = layer.pipe(
   Layer.provideMerge(AgentV2.locationLayer),
   Layer.provideMerge(SkillV2.locationLayer),
   Layer.provideMerge(Reference.locationLayer),
+  Layer.provideMerge(FileSystem.locationLayer),
 )

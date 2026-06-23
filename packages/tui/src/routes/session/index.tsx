@@ -1900,6 +1900,7 @@ function InlineTool(props: {
   pending: string
   failure?: string
   spinner?: boolean
+  separate?: boolean
   children: JSX.Element
   part: ToolPart
   onClick?: () => void
@@ -1952,6 +1953,7 @@ function InlineTool(props: {
       pending={props.pending}
       failure={props.failure}
       spinner={props.spinner}
+      separate={props.separate}
       onMouseOver={() => clickable() && setHover(true)}
       onMouseOut={() => setHover(false)}
       onMouseUp={() => {
@@ -1981,6 +1983,7 @@ export function InlineToolRow(props: {
   pending: string
   failure?: string
   spinner?: boolean
+  separate?: boolean
   children: JSX.Element
   onMouseOver?: () => void
   onMouseOut?: () => void
@@ -1993,8 +1996,12 @@ export function InlineToolRow(props: {
       onMouseOut={props.onMouseOut}
       onMouseUp={props.onMouseUp}
       ref={(el: BoxRenderable) => {
+        if (props.separate) alwaysSeparate.add(el)
         setPreLayoutSiblingMargin(el, (previous) => {
-          return previous instanceof BoxRenderable && (previous.height > 1 || alwaysSeparate.has(previous)) ? 1 : 0
+          return props.separate ||
+            (previous instanceof BoxRenderable && (previous.height > 1 || alwaysSeparate.has(previous)))
+            ? 1
+            : 0
         })
       }}
     >
@@ -2343,6 +2350,7 @@ function Task(props: ToolProps) {
   return (
     <InlineTool
       icon={props.part.state.status === "completed" ? "✓" : "│"}
+      separate={true}
       color={retry() ? theme.error : undefined}
       spinner={isRunning()}
       complete={stringValue(props.input.description)}
