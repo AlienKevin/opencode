@@ -75,6 +75,7 @@ import { setPreLayoutSiblingMargin } from "../../util/layout"
 import { useTuiConfig } from "../../config"
 import { useClipboard } from "../../context/clipboard"
 import { reasoningSummary, useThinkingMode, type ThinkingMode } from "../../context/thinking"
+import { toolPartVisible, useToolDetailsMode, type ToolDetailsMode } from "../../context/tool-details"
 import { getScrollAcceleration } from "../../util/scroll"
 import { collapseToolOutput } from "../../util/collapse-tool-output"
 import { usePluginRuntime } from "../../plugin/runtime"
@@ -173,7 +174,7 @@ const context = createContext<{
   thinkingMode: () => ThinkingMode
   showThinking: () => boolean
   showTimestamps: () => boolean
-  showDetails: () => boolean
+  toolDetailsMode: () => ToolDetailsMode
   showAssistantMetadata: () => boolean
   showGenericToolOutput: () => boolean
   diffWrapMode: () => "word" | "none"
@@ -261,8 +262,10 @@ export function Session() {
   const thinking = useThinkingMode()
   const thinkingMode = thinking.mode
   const showThinking = createMemo(() => true)
+  const toolDetails = useToolDetailsMode()
+  const toolDetailsMode = toolDetails.mode
+  const showDetails = createMemo(() => toolDetailsMode() === "show")
   const [timestamps, setTimestamps] = kv.signal<"hide" | "show">("timestamps", "hide")
-  const [showDetails, setShowDetails] = kv.signal("tool_details_visibility", true)
   const [showAssistantMetadata, setShowAssistantMetadata] = kv.signal(
     "assistant_metadata_visibility",
     DEFAULT_ASSISTANT_METADATA_VISIBLE,
@@ -716,13 +719,11 @@ export function Session() {
       run: showThinkingDialog,
     },
     {
-      title: showDetails() ? "Hide tool details" : "Show tool details",
+      title: "Tool details",
       value: "session.toggle.actions",
       category: "Session",
-      run: () => {
-        setShowDetails((prev) => !prev)
-        dialog.clear()
-      },
+      description: "Choose how tool calls are shown",
+      run: showToolDetailsDialog,
     },
     {
       title: showAssistantMetadata() ? "Hide assistant metadata" : "Show assistant metadata",
@@ -1135,6 +1136,52 @@ export function Session() {
     ))
   }
 
+  const toolDetailsOptions = createMemo<DialogSelectOption<ToolDetailsMode>[]>(() => [
+    {
+      title: "1. Show tool details",
+      value: "show",
+      description: "Display every tool call",
+      gutter: () => <text fg={theme.primary}>{toolDetailsMode() === "show" ? "✔" : " "}</text>,
+      onSelect: (dialog) => {
+        toolDetails.set("show")
+        dialog.clear()
+      },
+    },
+    {
+      title: "2. Hide tool details",
+      value: "hide",
+      description: "Hide tool call rows; errors still show",
+      gutter: () => <text fg={theme.primary}>{toolDetailsMode() === "hide" ? "✔" : " "}</text>,
+      onSelect: (dialog) => {
+        toolDetails.set("hide")
+        dialog.clear()
+      },
+    },
+    {
+      title: "3. Minimal tool details (hide when done)",
+      value: "minimal",
+      description: "Show active tools, then hide completed calls",
+      gutter: () => <text fg={theme.primary}>{toolDetailsMode() === "minimal" ? "✔" : " "}</text>,
+      onSelect: (dialog) => {
+        toolDetails.set("minimal")
+        dialog.clear()
+      },
+    },
+  ])
+
+  function showToolDetailsDialog() {
+    dialog.replace(() => (
+      <DialogSelect
+        title="Tool details"
+        placeholder="Select tool details mode"
+        options={toolDetailsOptions()}
+        current={toolDetailsMode()}
+        renderFilter={false}
+        footerHints={[{ title: "Enter", label: "confirm" }]}
+      />
+    ))
+  }
+
   const sessionCommands = createMemo(() =>
     sessionCommandList().map((command) => ({
       namespace: "palette",
@@ -1209,7 +1256,7 @@ export function Session() {
           thinkingMode,
           showThinking,
           showTimestamps,
-          showDetails,
+          toolDetailsMode,
           showAssistantMetadata,
           showGenericToolOutput,
           diffWrapMode,
@@ -1775,11 +1822,8 @@ function ToolPartImpl(props: { last: boolean; part: ToolPart; message: Assistant
   const ctx = use()
   const display = createMemo(() => toolDisplay(props.part.tool))
 
-  // Hide tool if showDetails is false and tool completed successfully
   const shouldHide = createMemo(() => {
-    if (ctx.showDetails()) return false
-    if (props.part.state.status !== "completed") return false
-    return true
+    return !toolPartVisible(ctx.toolDetailsMode(), props.part.state.status)
   })
 
   const toolprops = {

@@ -196,16 +196,8 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     )
   })
 
-  const rows = createMemo(() => {
-    const headers = grouped().reduce((acc, [category], i) => {
-      if (!category) return acc
-      return acc + (i > 0 ? 2 : 1)
-    }, 0)
-    return flat().reduce((acc, option) => acc + 1 + (option.details?.length ?? 0), headers)
-  })
-
   const dimensions = useTerminalDimensions()
-  const height = createMemo(() => Math.min(rows(), Math.floor(dimensions().height / 2) - 6))
+  const maxHeight = createMemo(() => Math.max(1, Math.floor(dimensions().height / 2) - 6))
 
   const selected = createMemo(() => flat()[store.selected])
 
@@ -541,7 +533,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
             scrollbarOptions={{ visible: false }}
             scrollAcceleration={scrollAcceleration()}
             ref={(r: ScrollBoxRenderable) => (scroll = r)}
-            maxHeight={height()}
+            maxHeight={maxHeight()}
           >
             <For each={grouped()}>
               {([category, options], index) => (
@@ -695,8 +687,7 @@ function Option(props: {
         flexGrow={1}
         fg={text()}
         attributes={props.active && !props.muted ? TextAttributes.BOLD : undefined}
-        overflow="hidden"
-        wrapMode="none"
+        wrapMode="word"
         paddingLeft={3}
       >
         {props.titleView ??

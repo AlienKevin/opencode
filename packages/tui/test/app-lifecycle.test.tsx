@@ -317,7 +317,7 @@ test("app.restart can return without destroying the renderer for exec handoff", 
   }
 })
 
-test("session UI exposes thinking selector and assistant metadata toggle", async () => {
+test("session UI exposes thinking, tool details, and assistant metadata controls", async () => {
   const setup = await createTestRenderer({ width: 100, height: 32, useThread: false })
   const core = await import("@opentui/core")
   mock.module("@opentui/core", () => ({ ...core, createCliRenderer: async () => setup.renderer }))
@@ -383,6 +383,16 @@ test("session UI exposes thinking selector and assistant metadata toggle", async
     })
     expect(dialogFrame).toContain("Show thinking")
     expect(dialogFrame).toContain("Minimal thinking")
+
+    api?.keymap.dispatchCommand("session.toggle.actions")
+    const toolDetailsFrame = await waitForFrame({
+      render: () => setup.renderOnce(),
+      capture: () => setup.captureCharFrame(),
+      text: "Tool details",
+    })
+    expect(toolDetailsFrame).toContain("Show tool details")
+    expect(toolDetailsFrame).toContain("Hide tool details")
+    expect(toolDetailsFrame).toContain("Minimal tool details")
 
     api?.keymap.dispatchCommand("app.exit")
     expect((await task).type).toBe("exit")
