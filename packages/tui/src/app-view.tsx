@@ -7,7 +7,7 @@ import { unwrap } from "solid-js/store"
 import { useClipboard } from "./context/clipboard"
 import { useExit } from "./context/exit"
 import { useKV } from "./context/kv"
-import { useLocal } from "./context/local"
+import { BUILD_AGENT_NAME, useLocal } from "./context/local"
 import { useProject } from "./context/project"
 import { usePromptRef } from "./context/prompt"
 import { useRoute, type Route } from "./context/route"
@@ -295,7 +295,7 @@ export function AppView(props: AppViewProps) {
         category: "Agent",
         hidden: true,
         run: () => {
-          local.agent.set("build")
+          local.agent.set(BUILD_AGENT_NAME)
         },
       },
       {
@@ -329,7 +329,7 @@ export function AppView(props: AppViewProps) {
         category: "Agent",
         hidden: true,
         run: () => {
-          local.agent.set("build")
+          local.agent.set(BUILD_AGENT_NAME)
         },
       },
       {

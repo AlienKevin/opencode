@@ -13,6 +13,8 @@ import { useTheme } from "./theme"
 import { useToast } from "../ui/toast"
 import { useRoute } from "./route"
 
+export const BUILD_AGENT_NAME = "build"
+
 export type LocalTheme = {
   secondary: RGBA
   accent: RGBA
@@ -45,6 +47,10 @@ export function recentModels(
     })
     .slice(0, 10)
     .map((item) => ({ providerID: item.providerID, modelID: item.modelID }))
+}
+
+export function resolveAgentName(name: string) {
+  return name === "plan" ? BUILD_AGENT_NAME : name
 }
 
 export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
@@ -92,10 +98,10 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           return agents()
         },
         current() {
-          return agents().find((x) => x.name === agentStore.current) ?? agents().find((x) => x.name === "build") ?? agents().at(0)
+          return agents().find((x) => x.name === agentStore.current) ?? agents().find((x) => x.name === BUILD_AGENT_NAME) ?? agents().at(0)
         },
         set(name: string) {
-          const target = name === "plan" ? "build" : name
+          const target = resolveAgentName(name)
           if (!agents().some((x) => x.name === target))
             return toast.show({
               variant: "warning",

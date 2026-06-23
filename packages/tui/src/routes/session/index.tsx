@@ -37,7 +37,7 @@ import type {
   ReasoningPart,
   SessionStatus,
 } from "@opencode-ai/sdk/v2"
-import { useLocal } from "../../context/local"
+import { BUILD_AGENT_NAME, useLocal } from "../../context/local"
 import { Locale } from "../../util/locale"
 import { webSearchProviderLabel } from "../../util/tool-display"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
@@ -93,6 +93,17 @@ const GO_UPSELL_WINDOW = 86_400_000 // 24 hrs
 const GO_UPSELL_PROVIDERS = new Set(["opencode", "opencode-go"])
 
 export const alwaysSeparate = new WeakSet<BoxRenderable>()
+export const DEFAULT_ASSISTANT_METADATA_VISIBLE = false
+
+export function shouldSwitchToBuildAgentForToolPart(part: Pick<ToolPart, "id" | "tool" | "state">, lastSwitch?: string) {
+  if (part.id === lastSwitch) return false
+  if (part.state.status !== "completed") return false
+  return part.tool === "plan_exit" || part.tool === "plan_enter"
+}
+
+export function reasoningPartVisible(mode: ThinkingMode, done: boolean) {
+  return !(mode === "minimal" && done)
+}
 
 type RetryAction = Extract<SessionStatus, { type: "retry" }>["action"]
 
@@ -252,7 +263,10 @@ export function Session() {
   const showThinking = createMemo(() => true)
   const [timestamps, setTimestamps] = kv.signal<"hide" | "show">("timestamps", "hide")
   const [showDetails, setShowDetails] = kv.signal("tool_details_visibility", true)
-  const [showAssistantMetadata, setShowAssistantMetadata] = kv.signal("assistant_metadata_visibility", false)
+  const [showAssistantMetadata, setShowAssistantMetadata] = kv.signal(
+    "assistant_metadata_visibility",
+    DEFAULT_ASSISTANT_METADATA_VISIBLE,
+  )
   const [showScrollbar, setShowScrollbar] = kv.signal("scrollbar_visible", false)
   const [diffWrapMode] = kv.signal<"word" | "none">("diff_wrap_mode", "word")
   const [_animationsEnabled, _setAnimationsEnabled] = kv.signal("animations_enabled", true)
@@ -319,11 +333,9 @@ export function Session() {
     const part = evt.properties.part
     if (part.type !== "tool") return
     if (part.sessionID !== route.sessionID) return
-    if (part.state.status !== "completed") return
-    if (part.id === lastSwitch) return
 
-    if (part.tool === "plan_exit" || part.tool === "plan_enter") {
-      local.agent.set("build")
+    if (shouldSwitchToBuildAgentForToolPart(part, lastSwitch)) {
+      local.agent.set(BUILD_AGENT_NAME)
       lastSwitch = part.id
     }
   })
@@ -1641,7 +1653,6 @@ function ReasoningPartImpl(props: {
   // Flips independently of the parent message completing.
   const isDone = createMemo(() => props.part.time.end !== undefined)
   const inHide = createMemo(() => props.thinkingMode() === "hide")
-  const isMinimal = createMemo(() => props.thinkingMode() === "minimal")
   const duration = createMemo(() => {
     const end = props.part.time.end
     return end === undefined ? 0 : Math.max(0, end - props.part.time.start)
@@ -1655,7 +1666,7 @@ function ReasoningPartImpl(props: {
   }
 
   return (
-    <Show when={content() && !(isMinimal() && isDone())}>
+    <Show when={content() && reasoningPartVisible(props.thinkingMode(), isDone())}>
       <box
         ref={(el: BoxRenderable) => alwaysSeparate.add(el)}
         paddingLeft={3}

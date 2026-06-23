@@ -638,6 +638,13 @@ describe("HttpApi SDK", () => {
           sdk.part.delete({ sessionID, messageID: seeded.message.id, partID: seeded.part.id }),
         )
         const withoutPart = yield* capture(() => sdk.session.message({ sessionID, messageID: seeded.message.id }))
+        const retractSeeded = yield* seedMessage(directory, sessionID)
+        const retract = yield* capture(() =>
+          sdk.session.retract({ sessionID, messageID: retractSeeded.message.id }),
+        )
+        const retractedMessage = yield* capture(() =>
+          sdk.session.message({ sessionID, messageID: retractSeeded.message.id }),
+        )
         const deleteMessage = yield* capture(() =>
           sdk.session.deleteMessage({ sessionID, messageID: seeded.message.id }),
         )
@@ -653,6 +660,8 @@ describe("HttpApi SDK", () => {
             updated,
             partDelete,
             withoutPart,
+            retract,
+            retractedMessage,
             deleteMessage,
             missingMessage,
           }),
@@ -661,6 +670,8 @@ describe("HttpApi SDK", () => {
           initialText: firstPartText(message.data),
           updatedText: firstPartText(updated.data),
           partCountAfterDelete: array(record(withoutPart.data).parts).length,
+          retract: retract.data,
+          retractedStatus: retractedMessage.status,
         }
       }),
     ),

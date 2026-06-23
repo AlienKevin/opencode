@@ -939,6 +939,40 @@ describe("session HttpApi", () => {
   )
 
   it.instance(
+    "retracts a message without removing other session messages",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const headers = { "x-opencode-directory": test.directory, "content-type": "application/json" }
+        const session = yield* createSession({ title: "retract" })
+        const first = yield* createTextMessage(session.id, "first")
+        const second = yield* createTextMessage(session.id, "second")
+
+        expect(
+          yield* requestJson<boolean>(pathFor(SessionPaths.retract, { sessionID: session.id }), {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ messageID: first.info.id }),
+          }),
+        ).toBe(true)
+
+        const missing = yield* request(
+          pathFor(SessionPaths.message, { sessionID: session.id, messageID: first.info.id }),
+          { headers },
+        )
+        expect(missing.status).toBe(404)
+
+        const messages = yield* requestJson<SessionV1.WithParts[]>(
+          pathFor(SessionPaths.messages, { sessionID: session.id }),
+          { headers },
+        )
+        expect(messages.map((message) => message.info.id)).not.toContain(first.info.id)
+        expect(messages.map((message) => message.info.id)).toContain(second.info.id)
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
     "rejects part updates whose path and body ids disagree",
     () =>
       Effect.gen(function* () {

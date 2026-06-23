@@ -37,7 +37,7 @@ import { usePromptStash } from "../../prompt/stash"
 import { DialogStash } from "../dialog-stash"
 import { type AutocompleteRef, Autocomplete } from "./autocomplete"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
-import type { AssistantMessage, FilePart, UserMessage } from "@opencode-ai/sdk/v2"
+import type { AssistantMessage, FilePart, Message, Part, SessionStatus, UserMessage } from "@opencode-ai/sdk/v2"
 import { Locale } from "../../util/locale"
 import { errorMessage } from "../../util/error"
 import { formatDuration } from "../../util/format"
@@ -100,6 +100,41 @@ const money = new Intl.NumberFormat("en-US", {
 })
 
 const DRAFT_RETENTION_MIN_CHARS = 20
+export const RESTARTING_STATUS_TEXT = "Restarting session..."
+
+export type EditLastMessageAction = {
+  kind: "revert" | "retract"
+  messageID: string
+  prompt: PromptInfo
+}
+
+export function editLastMessageAction(input: {
+  sessionID?: string
+  messages: Message[]
+  parts: Record<string, Part[] | undefined>
+  status?: SessionStatus
+  revertMessageID?: string
+}): EditLastMessageAction | undefined {
+  if (!input.sessionID) return
+  const message = input.messages.findLast(
+    (item): item is UserMessage =>
+      (!input.revertMessageID || item.id < input.revertMessageID) && item.role === "user",
+  )
+  if (!message) return
+  const prompt = (input.parts[message.id] ?? []).reduce(
+    (agg, part) => {
+      if (part.type === "text" && !part.synthetic) agg.input += part.text
+      if (part.type === "file") agg.parts.push(part)
+      return agg
+    },
+    { input: "", parts: [] as PromptInfo["parts"] },
+  )
+  return {
+    kind: input.status?.type === "idle" ? "revert" : "retract",
+    messageID: message.id,
+    prompt,
+  }
+}
 
 function randomIndex(count: number) {
   if (count <= 0) return 0
@@ -874,30 +909,22 @@ export function Prompt(props: PromptProps) {
     const sessionID = props.sessionID
     if (!sessionID) return false
     const sess = sync.session.get(sessionID)
-    const revertMessageID = sess?.revert?.messageID
-    const messages = sync.data.message[sessionID] ?? []
-    const message = messages.findLast((x) => (!revertMessageID || x.id < revertMessageID) && x.role === "user")
-    if (!message) return false
-    const status = sync.data.session_status?.[sessionID]
-    if (status?.type === "idle") {
-      void sdk.client.session.revert({ sessionID, messageID: message.id })
+    const action = editLastMessageAction({
+      sessionID,
+      messages: sync.data.message[sessionID] ?? [],
+      parts: sync.data.part,
+      status: sync.data.session_status?.[sessionID],
+      revertMessageID: sess?.revert?.messageID,
+    })
+    if (!action) return false
+    if (action.kind === "revert") {
+      void sdk.client.session.revert({ sessionID, messageID: action.messageID })
     } else {
-      void sdk.client.session.retract({ sessionID, messageID: message.id })
+      void sdk.client.session.retract({ sessionID, messageID: action.messageID })
     }
-    const parts = sync.data.part[message.id] ?? []
-    const reconstructed = parts.reduce(
-      (agg, part) => {
-        if (part.type === "text") {
-          if (!part.synthetic) agg.input += part.text
-        }
-        if (part.type === "file") agg.parts.push(part)
-        return agg
-      },
-      { input: "", parts: [] as PromptInfo["parts"] },
-    )
-    input.setText(reconstructed.input)
-    setStore("prompt", reconstructed)
-    restoreExtmarksFromParts(reconstructed.parts)
+    input.setText(action.prompt.input)
+    setStore("prompt", action.prompt)
+    restoreExtmarksFromParts(action.prompt.parts)
     input.gotoBufferEnd()
     return true
   }
@@ -1548,7 +1575,7 @@ export function Prompt(props: PromptProps) {
           <Switch>
             <Match when={restarting()}>
               <box paddingLeft={3}>
-                <Spinner color={theme.accent}>Restarting session...</Spinner>
+                <Spinner color={theme.accent}>{RESTARTING_STATUS_TEXT}</Spinner>
               </box>
             </Match>
             <Match when={status().type !== "idle"}>
