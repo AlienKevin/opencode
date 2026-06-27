@@ -36,6 +36,6 @@ export const layer = Layer.effect(
 
 export const defaultLayer = layer
 
-export const node = LayerNode.make(layer, [])
+export const node = LayerNode.make({ service: CoreBackgroundJob.Service, layer, deps: [] })
 
 export * as BackgroundJob from "./job"

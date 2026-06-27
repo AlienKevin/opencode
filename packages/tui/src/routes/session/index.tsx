@@ -90,7 +90,8 @@ import { usePluginRuntime } from "../../plugin/runtime"
 import { DialogRetryAction } from "../../component/dialog-retry-action"
 import { getRevertDiffFiles } from "../../util/revert-diff"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
-import { PathFormatterProvider, usePathFormatter } from "../../context/path-format"
+import { usePathFormatter } from "../../context/path-format"
+import { LocationProvider } from "../../context/location"
 
 addDefaultParsers(parsers.parsers)
 
@@ -217,6 +218,10 @@ export function Session() {
   const { theme } = useTheme()
   const promptRef = usePromptRef()
   const session = createMemo(() => sync.session.get(route.sessionID))
+  const location = createMemo(() => {
+    const current = session()
+    return current ? { directory: current.directory, workspaceID: current.workspaceID } : undefined
+  })
 
   createEffect(() => {
     const title = Locale.truncate(session()?.title ?? "", 50)
@@ -1358,7 +1363,7 @@ export function Session() {
   createEffect(on(() => route.sessionID, toBottom))
 
   return (
-    <PathFormatterProvider path={session()?.directory}>
+    <LocationProvider location={location()}>
       <context.Provider
         value={{
           get width() {
@@ -1566,18 +1571,8 @@ export function Session() {
           </Show>
         </box>
       </context.Provider>
-    </PathFormatterProvider>
+    </LocationProvider>
   )
-}
-
-const MIME_BADGE: Record<string, string> = {
-  "text/plain": "txt",
-  "image/png": "img",
-  "image/jpeg": "img",
-  "image/gif": "img",
-  "image/webp": "img",
-  "application/pdf": "pdf",
-  "application/x-directory": "dir",
 }
 
 function UserMessage(props: {
@@ -1640,14 +1635,12 @@ function UserMessage(props: {
               <box flexDirection="row" paddingBottom={metadataVisible() ? 1 : 0} paddingTop={1} gap={1} flexWrap="wrap">
                 <For each={files()}>
                   {(file) => {
-                    const bg = createMemo(() => {
-                      if (file.mime.startsWith("image/")) return theme.accent
-                      if (file.mime === "application/pdf") return theme.primary
-                      return theme.secondary
-                    })
+                    const directory = file.mime === "application/x-directory"
                     return (
                       <text fg={theme.text}>
-                        <span style={{ bg: bg(), fg: theme.background }}> {MIME_BADGE[file.mime] ?? file.mime} </span>
+                        <span style={{ bg: theme.secondary, fg: theme.background }}>
+                          {directory ? " Directory " : " File "}
+                        </span>
                         <span style={{ bg: theme.backgroundElement, fg: theme.textMuted }}> {file.filename} </span>
                       </text>
                     )
@@ -2226,7 +2219,7 @@ export function InlineToolRow(props: {
 }
 
 function BlockTool(props: {
-  title: string
+  title?: string
   children: JSX.Element
   onClick?: () => void
   part?: ToolPart
@@ -2255,15 +2248,19 @@ function BlockTool(props: {
         props.onClick?.()
       }}
     >
-      <Show
-        when={props.spinner}
-        fallback={
-          <text paddingLeft={3} fg={theme.textMuted}>
-            {props.title}
-          </text>
-        }
-      >
-        <Spinner color={theme.textMuted}>{props.title.replace(/^# /, "")}</Spinner>
+      <Show when={props.title}>
+        {(title) => (
+          <Show
+            when={props.spinner}
+            fallback={
+              <text paddingLeft={3} fg={theme.textMuted}>
+                {title()}
+              </text>
+            }
+          >
+            <Spinner color={theme.textMuted}>{title().replace(/^# /, "")}</Spinner>
+          </Show>
+        )}
       </Show>
       {props.children}
       <Show when={error()}>
@@ -2291,15 +2288,15 @@ function Shell(props: ToolProps) {
   const workdirDisplay = createMemo(() => {
     const workdir = stringValue(props.input.workdir)
     if (!workdir || workdir === ".") return undefined
-    return pathFormatter.format(workdir)
+    const formatted = pathFormatter.format(workdir)
+    if (formatted === ".") return undefined
+    return formatted
   })
 
   const title = createMemo(() => {
-    const desc = stringValue(props.input.description) ?? "Shell"
     const wd = workdirDisplay()
-    if (!wd) return `# ${desc}`
-    if (desc.includes(wd)) return `# ${desc}`
-    return `# ${desc} in ${wd}`
+    if (!wd) return
+    return `# Running in ${wd}`
   })
 
   return (
@@ -2308,11 +2305,12 @@ function Shell(props: ToolProps) {
         <BlockTool
           title={title()}
           part={props.part}
-          spinner={isRunning()}
           onClick={collapsed().overflow ? () => setExpanded((prev) => !prev) : undefined}
         >
           <box gap={1}>
-            <text fg={theme.text}>$ {stringValue(props.input.command)}</text>
+            <Show when={isRunning()} fallback={<text fg={theme.text}>$ {stringValue(props.input.command)}</text>}>
+              <Spinner color={theme.text}>{stringValue(props.input.command)}</Spinner>
+            </Show>
             <Show when={output()}>
               <text fg={theme.text}>{limited()}</text>
             </Show>

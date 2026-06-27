@@ -8,8 +8,8 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
-import { handleSelectionKey } from "./util/selection"
-import { createCliRenderer } from "@opentui/core"
+import * as Selection from "./util/selection"
+import { createCliRenderer, MouseButton } from "@opentui/core"
 import { RouteProvider, useRoute, type Route } from "./context/route"
 import {
   createEffect,
@@ -30,6 +30,7 @@ import { useEvent } from "./context/event"
 import { SDKProvider, useSDK } from "./context/sdk"
 import { SyncProvider, useSync } from "./context/sync"
 import { DataProvider } from "./context/data"
+import { LocationProvider } from "./context/location"
 import { LocalProvider, useLocal } from "./context/local"
 import { ThemeProvider, useTheme } from "./context/theme"
 import { PromptHistoryProvider } from "./component/prompt/history"
@@ -59,6 +60,55 @@ import { isRecord } from "./util/record"
 
 const hmrRoots = [{ id: "app-view.tsx#AppView", file: "app-view.tsx", exportName: "AppView" }] as const
 const HotAppView = hotComponent<AppViewProps>(hmrRoots[0].id, AppView)
+
+const appGlobalBindingCommands = [
+  "session.list",
+  "session.new",
+  "session.quick_switch.1",
+  "session.quick_switch.2",
+  "session.quick_switch.3",
+  "session.quick_switch.4",
+  "session.quick_switch.5",
+  "session.quick_switch.6",
+  "session.quick_switch.7",
+  "session.quick_switch.8",
+  "session.quick_switch.9",
+] as const
+
+const appBindingCommands = [
+  "command.palette.show",
+  "model.list",
+  "model.cycle_recent",
+  "model.cycle_recent_reverse",
+  "model.cycle_favorite",
+  "model.cycle_favorite_reverse",
+  "agent.list",
+  "mcp.list",
+  "agent.cycle",
+  "agent.cycle.reverse",
+  "variant.cycle",
+  "variant.list",
+  "provider.connect",
+  "console.org.switch",
+  "opencode.status",
+  "theme.switch",
+  "theme.switch_mode",
+  "theme.mode.lock",
+  "help.show",
+  "docs.open",
+  "diff.open",
+  "workspace.list",
+  "app.debug",
+  "app.console",
+  "app.heap_snapshot",
+  "terminal.suspend",
+  "terminal.title.toggle",
+  "app.toggle.animations",
+  "app.toggle.file_context",
+  "app.toggle.diffwrap",
+  "app.toggle.paste_summary",
+  "app.toggle.session_directory_filter",
+] as const
 
 export type TuiInput = {
   url: string
@@ -135,22 +185,24 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
   const result = yield* Effect.scoped(
     Effect.gen(function* () {
       const renderer = yield* Effect.acquireRelease(
-        Effect.tryPromise(() =>
-          createCliRenderer({
-            ...(input.restart?.adoptAlternateScreen ? { screenMode: "main-screen" as const } : {}),
-            externalOutputMode: "passthrough",
-            targetFps: 60,
-            gatherStats: false,
-            exitOnCtrlC: false,
-            useKittyKeyboard: {},
-            autoFocus: false,
-            openConsoleOnError: false,
-            useMouse: !Flag.OPENCODE_DISABLE_MOUSE && input.config.mouse,
-            consoleOptions: {
-              keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
-            },
+        Effect.tryPromise({
+          try: () =>
+            createCliRenderer({
+              ...(input.restart?.adoptAlternateScreen ? { screenMode: "main-screen" as const } : {}),
+              externalOutputMode: "passthrough",
+              targetFps: 60,
+              gatherStats: false,
+              exitOnCtrlC: false,
+              useKittyKeyboard: {},
+              autoFocus: false,
+              openConsoleOnError: false,
+              useMouse: !Flag.OPENCODE_DISABLE_MOUSE && input.config.mouse,
+              consoleOptions: {
+                keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
+              },
           }),
-        ),
+          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+        }),
         (renderer) =>
           Effect.sync(() => {
             if (input.restart?.preserveScreen && isRestartReason(exit.reason)) return
@@ -277,10 +329,12 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                           <PromptHistoryProvider>
                                                             <PromptRefProvider>
                                                               <EditorContextProvider>
-                                                                <App
-                                                                  onSnapshot={input.onSnapshot}
-                                                                  pluginHost={input.pluginHost}
-                                                                />
+                                                                <LocationProvider>
+                                                                  <App
+                                                                    onSnapshot={input.onSnapshot}
+                                                                    pluginHost={input.pluginHost}
+                                                                  />
+                                                                </LocationProvider>
                                                               </EditorContextProvider>
                                                             </PromptRefProvider>
                                                           </PromptHistoryProvider>
@@ -384,7 +438,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     "key",
     ({ event }) => {
       if (!Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT) return
-      handleSelectionKey(renderer, toast, event, clipboard)
+      Selection.handleSelectionKey(renderer, toast, event, clipboard)
     },
     { priority: 1 },
   )
