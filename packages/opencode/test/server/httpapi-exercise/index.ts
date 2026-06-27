@@ -593,6 +593,14 @@ const scenarios: Scenario[] = [
     .json(200, (body) => {
       check(body === false, "background route should be a no-op without running subagents")
     }),
+  http.protected
+    .get("/experimental/session/{sessionID}/background", "experimental.session.background.list")
+    .seeded((ctx) => ctx.session({ title: "Background list route owner" }))
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/background", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, array),
   http.protected.get("/experimental/resource", "experimental.resource.list").json(),
   http.protected
     .post("/sync/history", "sync.history.list")
@@ -1270,6 +1278,27 @@ const scenarios: Scenario[] = [
       Effect.gen(function* () {
         check(body === true, "delete message should return true")
         check((yield* ctx.messages(ctx.state.session.id)).length === 0, "deleted message should not remain")
+      }),
+    ),
+  http.protected
+    .post("/session/{sessionID}/retract", "session.retract")
+    .mutating()
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        const session = yield* ctx.session({ title: "Retract message session" })
+        const message = yield* ctx.message(session.id, { text: "retract message" })
+        return { session, message }
+      }),
+    )
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/retract", { sessionID: ctx.state.session.id }),
+      headers: ctx.headers(),
+      body: { messageID: ctx.state.message.info.id },
+    }))
+    .jsonEffect(200, (body, ctx) =>
+      Effect.gen(function* () {
+        check(body === true, "retract should return true")
+        check((yield* ctx.messages(ctx.state.session.id)).length === 0, "retracted message should not remain")
       }),
     ),
   http.protected

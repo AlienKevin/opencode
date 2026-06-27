@@ -22,9 +22,13 @@ export function toolDetailsModeFromValue(value: unknown): ToolDetailsMode {
   return DEFAULT_TOOL_DETAILS_MODE
 }
 
-export function toolPartVisible(mode: ToolDetailsMode, status: ToolPart["state"]["status"]) {
+export function toolPartVisible(
+  mode: ToolDetailsMode,
+  status: ToolPart["state"]["status"],
+  assistantCompleted = true,
+) {
   if (mode === "show") return true
-  if (mode === "minimal") return status !== "completed"
+  if (mode === "minimal") return status !== "error" && (!assistantCompleted || status !== "completed")
   return status === "error"
 }
 

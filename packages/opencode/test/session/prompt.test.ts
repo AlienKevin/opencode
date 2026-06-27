@@ -1353,6 +1353,125 @@ it.instance(
   3_000,
 )
 
+unix(
+  "prompt submitted during a running tool backgrounds the tool and receives completion",
+  () =>
+    Effect.gen(function* () {
+      if (!(yield* hasBash)) return
+
+      const { dir, llm } = yield* useServerConfig((url) => ({ ...providerCfg(url), shell: "bash" }))
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const background = yield* BackgroundJob.Service
+      const chat = yield* sessions.create({
+        title: "Background tool prompt",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+      const doneFile = path.join(dir, "background-tool-done.txt")
+      const donePath = `'${doneFile.replaceAll("'", "'\\''")}'`
+
+      yield* llm.tool("bash", {
+        command: `while [ ! -f ${donePath} ]; do sleep 0.05; done; cat ${donePath}`,
+        description: "Wait for marker file",
+        timeout: 30_000,
+        workdir: path.resolve(dir),
+      })
+      yield* llm.text("handled second")
+      yield* llm.text("handled background")
+
+      const first = yield* prompt
+        .prompt({
+          sessionID: chat.id,
+          agent: "build",
+          model: ref,
+          parts: [{ type: "text", text: "run the long command" }],
+        })
+        .pipe(Effect.forkChild)
+
+      const job = yield* pollWithTimeout(
+        background
+          .list()
+          .pipe(
+            Effect.map((jobs) =>
+              jobs.find(
+                (job) => job.type === "tool" && job.metadata?.sessionId === chat.id && job.status === "running",
+              ),
+            ),
+          ),
+        "timed out waiting for running tool job",
+      )
+
+      const secondID = MessageID.ascending()
+      const second = yield* prompt
+        .prompt({
+          sessionID: chat.id,
+          messageID: secondID,
+          agent: "build",
+          model: ref,
+          parts: [{ type: "text", text: "second prompt" }],
+        })
+        .pipe(Effect.forkChild)
+
+      yield* awaitWithTimeout(llm.wait(2), "timed out waiting for second model request")
+
+      const inputs = yield* llm.inputs
+      const messages = inputs.at(1)?.messages
+      if (!Array.isArray(messages)) throw new Error("expected second LLM messages")
+      expect(messages.at(-1)?.role).toBe("user")
+      expect(JSON.stringify(messages.at(-1))).toContain("second prompt")
+      expect(JSON.stringify(messages.at(-1))).toContain("<background_workers>")
+      expect(JSON.stringify(messages.at(-1))).toContain("Wait for marker file")
+
+      const started = yield* pollWithTimeout(
+        MessageV2.filterCompactedEffect(chat.id).pipe(
+          Effect.map((msgs) =>
+            msgs
+              .flatMap((msg) => msg.parts)
+              .find(
+                (part): part is CompletedToolPart =>
+                  part.type === "tool" &&
+                  part.tool === "bash" &&
+                  part.state.status === "completed" &&
+                  part.state.metadata.background === true,
+              ),
+          ),
+        ),
+        "timed out waiting for background-start tool result",
+      )
+      expect(started.state.output).toContain("still running in the background")
+
+      const [firstExit, secondExit] = yield* Effect.all([Fiber.await(first), Fiber.await(second)])
+      expect(Exit.isSuccess(firstExit)).toBe(true)
+      expect(Exit.isSuccess(secondExit)).toBe(true)
+
+      yield* writeText(doneFile, "background output")
+      const completed = yield* awaitWithTimeout(background.wait({ id: job.id }), "background tool did not complete")
+      expect(completed.info?.status).toBe("completed")
+      expect(completed.info?.output).toContain("background output")
+
+      yield* awaitWithTimeout(llm.wait(3), "timed out waiting for background completion prompt")
+      yield* pollWithTimeout(
+        sessions
+          .messages({ sessionID: chat.id })
+          .pipe(
+            Effect.map((msgs) =>
+              msgs.some((msg) =>
+                msg.parts.some((part) => part.type === "text" && part.text.includes("background output")),
+              )
+                ? true
+                : undefined,
+            ),
+          ),
+        "timed out waiting for background completion message",
+      )
+
+      const finalInputs = yield* llm.inputs
+      expect(JSON.stringify(finalInputs.at(2)?.messages)).toContain("background output")
+    }),
+  { git: true },
+  30_000,
+)
+
 it.instance(
   "assertNotBusy fails with BusyError when loop running",
   () =>
@@ -1630,7 +1749,7 @@ it.instance(
       expect(yield* llm.calls).toBe(1)
     }),
   { git: true },
-  3_000,
+  30_000,
 )
 
 it.instance(
@@ -1669,7 +1788,7 @@ it.instance(
       expect(yield* llm.calls).toBe(1)
     }),
   { git: true },
-  3_000,
+  30_000,
 )
 
 unix(

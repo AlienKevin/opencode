@@ -23,6 +23,8 @@ function mapWorktreeError<A, R>(self: Effect.Effect<A, Worktree.Error, R>) {
   )
 }
 
+const RECENT_BACKGROUND_JOB_MS = 60_000
+
 export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "experimental", (handlers) =>
   Effect.gen(function* () {
     const account = yield* Account.Service
@@ -161,13 +163,45 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       if (!flags.experimentalBackgroundSubagents) return false
       const jobs = (yield* background.list()).filter(
         (job) =>
-          job.type === "task" &&
+          (job.type === "task" || job.type === "tool") &&
           job.status === "running" &&
-          job.metadata?.parentSessionId === ctx.params.sessionID &&
+          (job.metadata?.parentSessionId === ctx.params.sessionID ||
+            job.metadata?.sessionId === ctx.params.sessionID) &&
           job.metadata.background !== true,
       )
       const promoted = yield* Effect.forEach(jobs, (job) => background.promote(job.id), { concurrency: "unbounded" })
       return promoted.some((job) => job !== undefined)
+    })
+
+    const sessionBackgroundList = Effect.fn("ExperimentalHttpApi.sessionBackgroundList")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      const now = Date.now()
+      return (yield* background.list())
+        .filter((job) => visibleBackgroundJob(job, ctx.params.sessionID, now))
+        .toSorted(
+          (a, b) =>
+            (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1) || b.started_at - a.started_at,
+        )
+        .map((job) => ({
+          id: job.id,
+          type: job.type,
+          title: job.title,
+          status: job.status,
+          summary: backgroundJobSummary(job),
+          severity: backgroundJobSeverity(job),
+          startedAt: job.started_at,
+          completedAt: job.completed_at,
+          sessionID: stringMetadata(job.metadata, "sessionId"),
+          parentSessionID: stringMetadata(job.metadata, "parentSessionId"),
+          messageID: stringMetadata(job.metadata, "messageId"),
+          callID: stringMetadata(job.metadata, "callId"),
+          tool: stringMetadata(job.metadata, "tool") ?? stringMetadata(job.metadata, "subagent") ?? job.type,
+          command: stringMetadata(job.metadata, "command"),
+          workdir: stringMetadata(job.metadata, "workdir"),
+          output: job.output ?? stringMetadata(job.metadata, "output"),
+          error: job.error,
+        }))
     })
 
     const resource = Effect.fn("ExperimentalHttpApi.resource")(function* () {
@@ -187,6 +221,35 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("worktreeReset", worktreeReset)
       .handle("session", session)
       .handle("sessionBackground", sessionBackground)
+      .handle("sessionBackgroundList", sessionBackgroundList)
       .handle("resource", resource)
   }),
 )
+
+function stringMetadata(metadata: Record<string, unknown> | undefined, key: string) {
+  const value = metadata?.[key]
+  return typeof value === "string" ? value : undefined
+}
+
+function visibleBackgroundJob(job: BackgroundJob.Info, sessionID: SessionID, now: number) {
+  if (job.type !== "task" && job.type !== "tool") return false
+  if (job.metadata?.background !== true) return false
+  if (
+    stringMetadata(job.metadata, "parentSessionId") !== sessionID &&
+    stringMetadata(job.metadata, "sessionId") !== sessionID
+  )
+    return false
+  if (job.status === "running") return true
+  return job.completed_at !== undefined && now - job.completed_at <= RECENT_BACKGROUND_JOB_MS
+}
+
+function backgroundJobSummary(job: BackgroundJob.Info) {
+  return stringMetadata(job.metadata, "summary") ?? stringMetadata(job.metadata, "description") ?? job.title
+}
+
+function backgroundJobSeverity(job: BackgroundJob.Info) {
+  if (job.status === "error") return "error" as const
+  if (job.status === "cancelled") return "warning" as const
+  if (job.status === "completed") return "success" as const
+  return "info" as const
+}

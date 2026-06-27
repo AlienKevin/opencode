@@ -48,6 +48,7 @@ import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { BackgroundJob } from "@/background/job"
 import { Database } from "@opencode-ai/core/database/database"
 import { SessionEvent } from "@opencode-ai/core/session/event"
 import { SessionMessage } from "@opencode-ai/core/session/message"
@@ -98,6 +99,7 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const status = yield* SessionStatus.Service
+    const background = yield* BackgroundJob.Service
     const sessions = yield* Session.Service
     const agents = yield* Agent.Service
     const provider = yield* Provider.Service
@@ -1120,7 +1122,9 @@ export const layer = Layer.effect(
       }
 
       if (input.noReply === true) return message
-      return yield* loop({ sessionID: input.sessionID })
+      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID), {
+        promote: true,
+      })
     })
 
     const lastAssistant = Effect.fnUntraced(function* (sessionID: SessionID) {
@@ -1234,6 +1238,7 @@ export const layer = Layer.effect(
             Effect.provideService(RuntimeFlags.Service, flags),
             Effect.provideService(FSUtil.Service, fsys),
             Effect.provideService(Session.Service, sessions),
+            Effect.provideService(BackgroundJob.Service, background),
           )
 
           const msg: SessionV1.Assistant = {
@@ -1284,6 +1289,7 @@ export const layer = Layer.effect(
               bypassAgentCheck,
               messages: msgs,
               promptOps,
+              background,
             }).pipe(
               Effect.provideService(Plugin.Service, plugin),
               Effect.provideService(Permission.Service, permission),
@@ -1538,38 +1544,42 @@ export const layer = Layer.effect(
 )
 
 export const defaultLayer = Layer.suspend(() =>
-  layer.pipe(
-    Layer.provide(SessionRunState.defaultLayer),
-    Layer.provide(SessionStatus.defaultLayer),
-    Layer.provide(SessionCompaction.defaultLayer),
-    Layer.provide(SessionProcessor.defaultLayer),
-    Layer.provide(Command.defaultLayer),
-    Layer.provide(Permission.defaultLayer),
-    Layer.provide(MCP.defaultLayer),
-    Layer.provide(LSP.defaultLayer),
-    Layer.provide(ToolRegistry.defaultLayer),
-    Layer.provide(Truncate.defaultLayer),
-    Layer.provide(Provider.defaultLayer),
-    Layer.provide(Config.defaultLayer),
-    Layer.provide(Instruction.defaultLayer),
-    Layer.provide(FSUtil.defaultLayer),
-    Layer.provide(Plugin.defaultLayer),
-    Layer.provide(Session.defaultLayer),
-    Layer.provide(SessionRevert.defaultLayer),
-    Layer.provide(SessionSummary.defaultLayer),
-    Layer.provide(Image.defaultLayer),
-    Layer.provide(
-      Layer.mergeAll(
-        Agent.defaultLayer,
-        Database.defaultLayer,
-        SystemPrompt.defaultLayer,
-        LLM.defaultLayer,
-        CrossSpawnSpawner.defaultLayer,
-        RuntimeFlags.defaultLayer,
-        EventV2Bridge.defaultLayer,
+  layer
+    .pipe(
+      Layer.provide(SessionRunState.layer),
+      Layer.provide(BackgroundJob.defaultLayer),
+      Layer.provide(SessionStatus.defaultLayer),
+      Layer.provide(SessionCompaction.defaultLayer),
+      Layer.provide(SessionProcessor.defaultLayer),
+      Layer.provide(Command.defaultLayer),
+      Layer.provide(Permission.defaultLayer),
+      Layer.provide(MCP.defaultLayer),
+      Layer.provide(LSP.defaultLayer),
+      Layer.provide(ToolRegistry.defaultLayer),
+      Layer.provide(Truncate.defaultLayer),
+      Layer.provide(Provider.defaultLayer),
+      Layer.provide(Config.defaultLayer),
+      Layer.provide(Instruction.defaultLayer),
+      Layer.provide(FSUtil.defaultLayer),
+      Layer.provide(Plugin.defaultLayer),
+      Layer.provide(Session.defaultLayer),
+      Layer.provide(SessionRevert.defaultLayer),
+      Layer.provide(SessionSummary.defaultLayer),
+      Layer.provide(Image.defaultLayer),
+    )
+    .pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Agent.defaultLayer,
+          Database.defaultLayer,
+          SystemPrompt.defaultLayer,
+          LLM.defaultLayer,
+          CrossSpawnSpawner.defaultLayer,
+          RuntimeFlags.defaultLayer,
+          EventV2Bridge.defaultLayer,
+        ),
       ),
     ),
-  ),
 )
 const ModelRef = Schema.Struct({
   providerID: ProviderV2.ID,
@@ -1695,6 +1705,7 @@ export const node = LayerNode.make(layer, [
   CrossSpawnSpawner.node,
   Instruction.node,
   SessionRunState.node,
+  BackgroundJob.node,
   SessionRevert.node,
   SessionSummary.node,
   SystemPrompt.node,

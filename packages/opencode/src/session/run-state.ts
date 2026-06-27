@@ -15,6 +15,7 @@ export interface Interface {
     sessionID: SessionID,
     onInterrupt: Effect.Effect<SessionV1.WithParts>,
     work: Effect.Effect<SessionV1.WithParts>,
+    options?: { promote?: boolean },
   ) => Effect.Effect<SessionV1.WithParts>
   readonly startShell: (
     sessionID: SessionID,
@@ -89,7 +90,11 @@ export const layer = Layer.effect(
       sessionID: SessionID,
       onInterrupt: Effect.Effect<SessionV1.WithParts>,
       work: Effect.Effect<SessionV1.WithParts>,
+      options?: { promote?: boolean },
     ) {
+      const data = yield* InstanceState.get(state)
+      const existing = data.runners.get(sessionID)
+      if (options?.promote === true && existing?.busy) yield* promoteForegroundJobs(background, sessionID)
       return yield* (yield* runner(sessionID, onInterrupt)).ensureRunning(work)
     })
 
@@ -122,6 +127,7 @@ const cancelBackgroundJobs = Effect.fn("SessionRunState.cancelBackgroundJobs")(f
   const cancelled = new Set<string>()
   const matches = (job: BackgroundJob.Info) => {
     if (job.status !== "running") return false
+    if (job.type === "tool" && job.metadata?.background !== true) return false
     if (cancelled.has(job.id)) return false
     if (pending.has(job.id)) return true
     if (typeof job.metadata?.sessionId === "string" && pending.has(job.metadata.sessionId)) return true
@@ -145,6 +151,20 @@ const cancelBackgroundJobs = Effect.fn("SessionRunState.cancelBackgroundJobs")(f
     )
     batch = jobs.filter(matches)
   }
+})
+
+const promoteForegroundJobs = Effect.fn("SessionRunState.promoteForegroundJobs")(function* (
+  background: BackgroundJob.Interface,
+  sessionID: SessionID,
+) {
+  const jobs = (yield* background.list()).filter(
+    (job) =>
+      (job.type === "task" || job.type === "tool") &&
+      job.status === "running" &&
+      job.metadata?.background !== true &&
+      (job.metadata?.sessionId === sessionID || job.metadata?.parentSessionId === sessionID),
+  )
+  yield* Effect.forEach(jobs, (job) => background.promote(job.id), { concurrency: "unbounded", discard: true })
 })
 
 function busyError(sessionID: SessionID) {

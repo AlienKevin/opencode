@@ -5,12 +5,15 @@ import { Agent } from "@/agent/agent"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { InstanceState } from "@/effect/instance-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { BackgroundJob } from "@/background/job"
 import { PartID } from "./schema"
 import { MessageV2 } from "./message-v2"
 import { Session } from "./session"
 import PROMPT_PLAN from "./prompt/plan.txt"
 import BUILD_SWITCH from "./prompt/build-switch.txt"
 import PLAN_MODE from "./prompt/plan-mode.txt"
+
+const BACKGROUND_WORKERS_MARKER = "<background_workers>"
 
 export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   messages: SessionV1.WithParts[]
@@ -22,6 +25,7 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   const sessions = yield* Session.Service
   const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
   if (!userMessage) return input.messages
+  yield* applyBackgroundWorkers(input, userMessage)
 
   if (!flags.experimentalPlanMode) {
     if (input.agent.name === "plan") {
@@ -88,5 +92,60 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   userMessage.parts.push(part)
   return input.messages
 })
+
+const applyBackgroundWorkers = Effect.fn("SessionReminders.applyBackgroundWorkers")(function* (
+  input: {
+    session: Session.Info
+  },
+  userMessage: SessionV1.WithParts,
+) {
+  userMessage.parts = userMessage.parts.filter(
+    (part) => !(part.type === "text" && part.synthetic === true && part.text.includes(BACKGROUND_WORKERS_MARKER)),
+  )
+  const background = yield* BackgroundJob.Service
+  const jobs = (yield* background.list()).filter(
+    (job) =>
+      job.status === "running" &&
+      job.metadata?.background === true &&
+      (stringMetadata(job.metadata, "parentSessionId") === input.session.id ||
+        stringMetadata(job.metadata, "sessionId") === input.session.id),
+  )
+  if (jobs.length === 0) return
+  userMessage.parts.push({
+    id: PartID.ascending(),
+    messageID: userMessage.info.id,
+    sessionID: userMessage.info.sessionID,
+    type: "text",
+    text: renderBackgroundWorkers(jobs),
+    synthetic: true,
+  })
+})
+
+function renderBackgroundWorkers(jobs: BackgroundJob.Info[]) {
+  return [
+    BACKGROUND_WORKERS_MARKER,
+    "The following background workers are still running. Coordinate around them; do not duplicate their work or poll for status unless the user asks.",
+    ...jobs.map(renderBackgroundWorker),
+    "</background_workers>",
+  ].join("\n")
+}
+
+function renderBackgroundWorker(job: BackgroundJob.Info) {
+  const tool = stringMetadata(job.metadata, "tool") ?? stringMetadata(job.metadata, "subagent") ?? job.type
+  const summary = stringMetadata(job.metadata, "summary") ?? stringMetadata(job.metadata, "description") ?? job.title ?? tool
+  const output = stringMetadata(job.metadata, "output")
+  if (!output) return `- ${job.title ?? summary} (${tool}): ${summary}`
+  return `- ${job.title ?? summary} (${tool}): ${summary}\n  latest output: ${truncate(output.trim(), 800)}`
+}
+
+function stringMetadata(metadata: Record<string, unknown> | undefined, key: string) {
+  const value = metadata?.[key]
+  return typeof value === "string" ? value : undefined
+}
+
+function truncate(text: string, max: number) {
+  if (text.length <= max) return text
+  return `${text.slice(0, max)}...`
+}
 
 export * as SessionReminders from "./reminders"

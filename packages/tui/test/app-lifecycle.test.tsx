@@ -87,7 +87,7 @@ function createSessionFixtureFetch() {
     id: "msg_assistant",
     sessionID: session.id,
     role: "assistant",
-    time: { created: 1, completed: 2 },
+    time: { created: 1 },
     parentID: user.id,
     modelID: "model",
     providerID: "test",
@@ -96,7 +96,6 @@ function createSessionFixtureFetch() {
     path: { cwd: directory, root: directory },
     cost: 0,
     tokens: { input: 0, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
-    finish: "stop",
   }
   const parts = [
     {
@@ -121,6 +120,22 @@ function createSessionFixtureFetch() {
       messageID: assistant.id,
       type: "text",
       text: "assistant answer",
+    },
+    {
+      id: "prt_active_completed_tool",
+      sessionID: session.id,
+      messageID: assistant.id,
+      type: "tool",
+      callID: "call_active_completed_tool",
+      tool: "read",
+      state: {
+        status: "completed",
+        input: { filePath: "active-completed-tool.txt" },
+        output: "active tool output",
+        title: "Read active-completed-tool.txt",
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
     },
   ]
   return createFetch((url) => {
@@ -393,6 +408,15 @@ test("session UI exposes thinking, tool details, and assistant metadata controls
     expect(toolDetailsFrame).toContain("Show tool details")
     expect(toolDetailsFrame).toContain("Hide tool details")
     expect(toolDetailsFrame).toContain("Minimal tool details")
+
+    api?.keymap.dispatchCommand("dialog.select.end")
+    api?.keymap.dispatchCommand("dialog.select.submit")
+    const minimalToolFrame = await waitForFrame({
+      render: () => setup.renderOnce(),
+      capture: () => setup.captureCharFrame(),
+      text: "active-completed-tool.txt",
+    })
+    expect(minimalToolFrame).toContain("active-completed-tool.txt")
 
     api?.keymap.dispatchCommand("app.exit")
     expect((await task).type).toBe("exit")

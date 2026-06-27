@@ -172,6 +172,9 @@ export const TaskTool = Tool.define(
         parentSessionId: ctx.sessionID,
         sessionId: nextSession.id,
         model,
+        worker: "subagent",
+        subagent: next.name,
+        summary: params.description,
         ...(runInBackground ? { background: true } : {}),
       }
 

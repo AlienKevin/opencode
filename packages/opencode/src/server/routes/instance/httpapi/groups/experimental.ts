@@ -87,6 +87,29 @@ export const SessionListQuery = Schema.Struct({
   archived: Schema.optional(QueryBoolean),
 })
 
+const BackgroundJobStatus = Schema.Literals(["running", "completed", "error", "cancelled"])
+const BackgroundJobSeverity = Schema.Literals(["info", "success", "warning", "error"])
+const BackgroundJobListItem = Schema.Struct({
+  id: Schema.String,
+  type: Schema.String,
+  title: Schema.optional(Schema.String),
+  status: BackgroundJobStatus,
+  summary: Schema.optional(Schema.String),
+  severity: BackgroundJobSeverity,
+  startedAt: NonNegativeInt,
+  completedAt: Schema.optional(NonNegativeInt),
+  sessionID: Schema.optional(Schema.String),
+  parentSessionID: Schema.optional(Schema.String),
+  messageID: Schema.optional(Schema.String),
+  callID: Schema.optional(Schema.String),
+  tool: Schema.optional(Schema.String),
+  command: Schema.optional(Schema.String),
+  workdir: Schema.optional(Schema.String),
+  output: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "BackgroundJobListItem" })
+const BackgroundJobList = Schema.Array(BackgroundJobListItem).annotate({ identifier: "BackgroundJobList" })
+
 export const ExperimentalPaths = {
   capabilities: "/experimental/capabilities",
   console: "/experimental/console",
@@ -98,6 +121,7 @@ export const ExperimentalPaths = {
   worktreeReset: "/experimental/worktree/reset",
   session: "/experimental/session",
   sessionBackground: "/experimental/session/:sessionID/background",
+  sessionBackgroundList: "/experimental/session/:sessionID/background",
   resource: "/experimental/resource",
 } as const
 
@@ -243,6 +267,18 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Background subagents",
             description:
               "Detach any synchronous subagents currently blocking the session and continue them in the background.",
+          }),
+        ),
+        HttpApiEndpoint.get("sessionBackgroundList", ExperimentalPaths.sessionBackgroundList, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(BackgroundJobList, "Background jobs"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.background.list",
+            summary: "List background jobs",
+            description: "List running and recently finished background tool calls and subagent jobs for the session.",
           }),
         ),
         HttpApiEndpoint.get("resource", ExperimentalPaths.resource, {

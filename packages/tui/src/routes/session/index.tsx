@@ -36,6 +36,7 @@ import type {
   TextPart,
   ReasoningPart,
   SessionStatus,
+  BackgroundJobListItem,
 } from "@opencode-ai/sdk/v2"
 import { BUILD_AGENT_NAME, useLocal } from "../../context/local"
 import { Locale } from "../../util/locale"
@@ -56,6 +57,13 @@ import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
 import { Sidebar } from "./sidebar"
 import { SubagentFooter } from "./subagent-footer.tsx"
+import {
+  BackgroundJobsFooter,
+  BackgroundJobTraceDialog,
+  backgroundJobDetails,
+  formatBackgroundJobDescription,
+  formatBackgroundJobTitle,
+} from "./background-jobs.tsx"
 import { filetype } from "../../util/filetype"
 import parsers from "../../parsers-config"
 import { errorMessage } from "../../util/error"
@@ -142,6 +150,7 @@ const sessionBindingCommands = [
   "session.toggle.assistant_metadata",
   "session.toggle.scrollbar",
   "session.toggle.generic_tool_output",
+  "session.background.jobs",
   "session.first",
   "session.last",
   "session.messages_last_user",
@@ -290,6 +299,47 @@ export function Session() {
   const toast = useToast()
   const sdk = useSDK()
   const editor = useEditorContext()
+  const [backgroundJobs, setBackgroundJobs] = createSignal<BackgroundJobListItem[]>([])
+  const [backgroundNow, setBackgroundNow] = createSignal(Date.now())
+
+  function refreshBackgroundJobs(sessionID = route.sessionID) {
+    setBackgroundNow(Date.now())
+    // Guard against the SDK lacking the experimental endpoint (e.g. HMR module
+    // skew or an older server build) so a missing optional feature can never
+    // bring down the whole TUI. Do not gate this read-only list on background
+    // subagents: promoted background tool calls can exist without that flag.
+    const api = sdk.client.experimental?.session?.background2
+    if (!api) {
+      if (sessionID === route.sessionID) setBackgroundJobs([])
+      return
+    }
+    void api
+      .list({ sessionID, workspace: project.workspace.current() })
+      .then((result) => {
+        if (sessionID === route.sessionID) setBackgroundJobs(result.data ?? [])
+      })
+      .catch(() => {
+        if (sessionID === route.sessionID) setBackgroundJobs([])
+      })
+  }
+
+  createEffect(
+    on(
+      () => route.sessionID,
+      (sessionID) => {
+        let stopped = false
+        const refresh = () => {
+          if (!stopped) refreshBackgroundJobs(sessionID)
+        }
+        refresh()
+        const timer = setInterval(refresh, 1000)
+        onCleanup(() => {
+          stopped = true
+          clearInterval(timer)
+        })
+      },
+    ),
+  )
 
   createEffect(() => {
     const sessionID = route.sessionID
@@ -1040,6 +1090,17 @@ export function Session() {
       },
     },
     {
+      title: "Show background workers",
+      value: "session.background.jobs",
+      category: "Session",
+      enabled: backgroundJobs().length > 0,
+      slash: {
+        name: "jobs",
+        aliases: ["background-jobs", "background-tools"],
+      },
+      run: showBackgroundJobsDialog,
+    },
+    {
       title: "Go to child session",
       value: "session.child.first",
       category: "Session",
@@ -1180,6 +1241,58 @@ export function Session() {
         footerHints={[{ title: "Enter", label: "confirm" }]}
       />
     ))
+  }
+
+  const backgroundJobOptions = createMemo<DialogSelectOption<string>[]>(() =>
+    backgroundJobs().map((job) => ({
+      title: formatBackgroundJobTitle(job),
+      value: job.id,
+      description: formatBackgroundJobDescription(job, backgroundNow()),
+      details: backgroundJobDetails(job),
+      onSelect: (dialog) => {
+        if (job.type === "task" && job.sessionID) {
+          enterChild(job.sessionID)
+          dialog.clear()
+          return
+        }
+        dialog.replace(() =>
+          <BackgroundJobTraceDialog
+            title={formatBackgroundJobTitle(job)}
+            job={() => backgroundJobs().find((item) => item.id === job.id) ?? job}
+            now={backgroundNow}
+            input={() => backgroundJobInput(backgroundJobs().find((item) => item.id === job.id) ?? job)}
+          />,
+        )
+        dialog.setSize("large")
+      },
+    })),
+  )
+
+  function showBackgroundJobsDialog() {
+    refreshBackgroundJobs()
+    dialog.replace(() => (
+      <DialogSelect
+        title="Background workers"
+        placeholder="Filter background workers"
+        options={backgroundJobOptions()}
+        renderFilter={backgroundJobOptions().length > 5}
+        emptyView={<text fg={theme.textMuted}>No background workers</text>}
+        footerHints={[{ title: "Enter", label: "open" }]}
+      />
+    ))
+  }
+
+  function backgroundJobInput(job: BackgroundJobListItem) {
+    const part = job.messageID
+      ? (sync.data.part[job.messageID] ?? []).find(
+          (part): part is ToolPart => part.type === "tool" && part.callID === job.callID,
+        )
+      : undefined
+    const input = part?.state.input
+    return {
+      command: stringValue(input?.command),
+      workdir: stringValue(input?.workdir),
+    }
   }
 
   const sessionCommands = createMemo(() =>
@@ -1397,6 +1510,13 @@ export function Session() {
                 </Show>
                 <Show when={session()?.parentID}>
                   <SubagentFooter />
+                </Show>
+                <Show when={backgroundJobs().length > 0}>
+                  <BackgroundJobsFooter
+                    jobs={backgroundJobs()}
+                    now={backgroundNow()}
+                    onClick={showBackgroundJobsDialog}
+                  />
                 </Show>
                 <Show when={visible()}>
                   <pluginRuntime.Slot
@@ -1823,7 +1943,7 @@ function ToolPartImpl(props: { last: boolean; part: ToolPart; message: Assistant
   const display = createMemo(() => toolDisplay(props.part.tool))
 
   const shouldHide = createMemo(() => {
-    return !toolPartVisible(ctx.toolDetailsMode(), props.part.state.status)
+    return !toolPartVisible(ctx.toolDetailsMode(), props.part.state.status, props.message.time.completed !== undefined)
   })
 
   const toolprops = {

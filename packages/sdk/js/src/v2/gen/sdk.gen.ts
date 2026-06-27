@@ -43,6 +43,8 @@ import type {
   ExperimentalResourceListErrors,
   ExperimentalResourceListResponses,
   ExperimentalSessionBackgroundErrors,
+  ExperimentalSessionBackgroundListErrors,
+  ExperimentalSessionBackgroundListResponses,
   ExperimentalSessionBackgroundResponses,
   ExperimentalSessionListErrors,
   ExperimentalSessionListResponses,
@@ -780,6 +782,44 @@ export class Console extends HeyApiClient {
   }
 }
 
+export class Background extends HeyApiClient {
+  /**
+   * List background jobs
+   *
+   * List running and recently finished background tool calls and subagent jobs for the session.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalSessionBackgroundListResponses,
+      ExperimentalSessionBackgroundListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session/{sessionID}/background",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Session extends HeyApiClient {
   /**
    * List sessions
@@ -861,6 +901,11 @@ export class Session extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  private _background?: Background
+  get background2(): Background {
+    return (this._background ??= new Background({ client: this.client }))
   }
 }
 

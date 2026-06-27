@@ -2241,6 +2241,28 @@ export type GlobalSession = {
   project: ProjectSummary | null
 }
 
+export type BackgroundJobListItem = {
+  id: string
+  type: string
+  title?: string
+  status: "running" | "completed" | "error" | "cancelled"
+  summary?: string
+  severity: "info" | "success" | "warning" | "error"
+  startedAt: number
+  completedAt?: number
+  sessionID?: string
+  parentSessionID?: string
+  messageID?: string
+  callID?: string
+  tool?: string
+  command?: string
+  workdir?: string
+  output?: string
+  error?: string
+}
+
+export type BackgroundJobList = Array<BackgroundJobListItem>
+
 export type McpResource = {
   name: string
   uri: string
@@ -7608,6 +7630,38 @@ export type ExperimentalSessionListResponses = {
 }
 
 export type ExperimentalSessionListResponse = ExperimentalSessionListResponses[keyof ExperimentalSessionListResponses]
+
+export type ExperimentalSessionBackgroundListData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session/{sessionID}/background"
+}
+
+export type ExperimentalSessionBackgroundListErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type ExperimentalSessionBackgroundListError =
+  ExperimentalSessionBackgroundListErrors[keyof ExperimentalSessionBackgroundListErrors]
+
+export type ExperimentalSessionBackgroundListResponses = {
+  /**
+   * Background jobs
+   */
+  200: BackgroundJobList
+}
+
+export type ExperimentalSessionBackgroundListResponse =
+  ExperimentalSessionBackgroundListResponses[keyof ExperimentalSessionBackgroundListResponses]
 
 export type ExperimentalSessionBackgroundData = {
   body?: never

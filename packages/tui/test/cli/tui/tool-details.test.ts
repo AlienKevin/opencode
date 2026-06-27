@@ -28,11 +28,13 @@ describe("tool details mode", () => {
     expect(legacyToolDetailsMode(undefined)).toBe("show")
   })
 
-  test("shows minimal tools only while active or errored", () => {
+  test("shows minimal tools until the assistant turn completes", () => {
     expect(toolPartVisible("minimal", "pending")).toBe(true)
     expect(toolPartVisible("minimal", "running")).toBe(true)
-    expect(toolPartVisible("minimal", "error")).toBe(true)
-    expect(toolPartVisible("minimal", "completed")).toBe(false)
+    expect(toolPartVisible("minimal", "error", false)).toBe(false)
+    expect(toolPartVisible("minimal", "error", true)).toBe(false)
+    expect(toolPartVisible("minimal", "completed", false)).toBe(true)
+    expect(toolPartVisible("minimal", "completed", true)).toBe(false)
   })
 
   test("hide mode keeps errors visible", () => {
