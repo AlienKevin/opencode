@@ -7,6 +7,11 @@ export function LocationProvider(props: ParentProps<{ location?: LocationRef }>)
   return <context.Provider value={() => props.location}>{props.children}</context.Provider>
 }
 
+export function useOptionalLocation() {
+  const value = useContext(context)
+  return value ?? (() => undefined)
+}
+
 export function useLocation() {
   const value = useContext(context)
   if (!value) throw new Error("Location context must be used within a LocationProvider")

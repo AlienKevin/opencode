@@ -61,8 +61,12 @@ import {
   BackgroundJobsFooter,
   BackgroundJobTraceDialog,
   backgroundJobDetails,
+  defaultBackgroundJobID,
   formatBackgroundJobDescription,
   formatBackgroundJobTitle,
+  nextBackgroundJobID,
+  previousBackgroundJobOrExit,
+  selectedBackgroundJob,
 } from "./background-jobs.tsx"
 import { filetype } from "../../util/filetype"
 import parsers from "../../parsers-config"
@@ -92,6 +96,7 @@ import { getRevertDiffFiles } from "../../util/revert-diff"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
 import { LocationProvider } from "../../context/location"
+import { useHmrRestartRequired } from "../../hmr"
 
 addDefaultParsers(parsers.parsers)
 
@@ -306,6 +311,8 @@ export function Session() {
   const editor = useEditorContext()
   const [backgroundJobs, setBackgroundJobs] = createSignal<BackgroundJobListItem[]>([])
   const [backgroundNow, setBackgroundNow] = createSignal(Date.now())
+  const [backgroundJobsFocused, setBackgroundJobsFocused] = createSignal(false)
+  const [selectedBackgroundJobID, setSelectedBackgroundJobID] = createSignal<string>()
 
   function refreshBackgroundJobs(sessionID = route.sessionID) {
     setBackgroundNow(Date.now())
@@ -345,6 +352,17 @@ export function Session() {
       },
     ),
   )
+
+  createEffect(() => {
+    const jobs = backgroundJobs()
+    if (jobs.length === 0) {
+      setBackgroundJobsFocused(false)
+      setSelectedBackgroundJobID(undefined)
+      return
+    }
+    if (jobs.some((job) => job.id === selectedBackgroundJobID())) return
+    setSelectedBackgroundJobID(defaultBackgroundJobID(jobs))
+  })
 
   createEffect(() => {
     const sessionID = route.sessionID
@@ -1248,28 +1266,64 @@ export function Session() {
     ))
   }
 
+  function openBackgroundJob(job: BackgroundJobListItem) {
+    if (job.type === "task" && job.sessionID) {
+      enterChild(job.sessionID)
+      dialog.clear()
+      setBackgroundJobsFocused(false)
+      return
+    }
+    dialog.replace(() => (
+      <BackgroundJobTraceDialog
+        title={formatBackgroundJobTitle(job)}
+        job={() => backgroundJobs().find((item) => item.id === job.id) ?? job}
+        now={backgroundNow}
+        input={() => backgroundJobInput(backgroundJobs().find((item) => item.id === job.id) ?? job)}
+      />
+    ))
+    dialog.setSize("large")
+  }
+
+  function focusBackgroundJobs() {
+    if (backgroundJobs().length === 0 || dialog.stack.length > 0) return
+    setSelectedBackgroundJobID(selectedBackgroundJob(backgroundJobs(), selectedBackgroundJobID())?.id)
+    setBackgroundJobsFocused(true)
+    prompt?.blur()
+    return true
+  }
+
+  function clearBackgroundJobsFocus() {
+    setBackgroundJobsFocused(false)
+    prompt?.focus()
+  }
+
+  function moveSelectedBackgroundJob(direction: 1 | -1) {
+    setSelectedBackgroundJobID(nextBackgroundJobID(backgroundJobs(), selectedBackgroundJobID(), direction))
+  }
+
+  // Moving "up"/"previous" from the top worker returns focus to the prompt
+  // (which sits directly above the panel) instead of wrapping to the bottom.
+  function selectPreviousBackgroundJobOrExit() {
+    const action = previousBackgroundJobOrExit(backgroundJobs(), selectedBackgroundJobID())
+    if (action.type === "exit") {
+      clearBackgroundJobsFocus()
+      return
+    }
+    setSelectedBackgroundJobID(action.id)
+  }
+
+  function openSelectedBackgroundJob() {
+    const job = selectedBackgroundJob(backgroundJobs(), selectedBackgroundJobID())
+    if (job) openBackgroundJob(job)
+  }
+
   const backgroundJobOptions = createMemo<DialogSelectOption<string>[]>(() =>
     backgroundJobs().map((job) => ({
       title: formatBackgroundJobTitle(job),
       value: job.id,
       description: formatBackgroundJobDescription(job, backgroundNow()),
       details: backgroundJobDetails(job),
-      onSelect: (dialog) => {
-        if (job.type === "task" && job.sessionID) {
-          enterChild(job.sessionID)
-          dialog.clear()
-          return
-        }
-        dialog.replace(() =>
-          <BackgroundJobTraceDialog
-            title={formatBackgroundJobTitle(job)}
-            job={() => backgroundJobs().find((item) => item.id === job.id) ?? job}
-            now={backgroundNow}
-            input={() => backgroundJobInput(backgroundJobs().find((item) => item.id === job.id) ?? job)}
-          />,
-        )
-        dialog.setSize("large")
-      },
+      onSelect: () => openBackgroundJob(job),
     })),
   )
 
@@ -1334,6 +1388,50 @@ export function Session() {
     enabled: foregroundTasks().length > 0,
     priority: 1,
     bindings: tuiConfig.keybinds.get("session.background"),
+  }))
+
+  useBindings(() => ({
+    mode: OPENCODE_BASE_MODE,
+    enabled: backgroundJobsFocused() && dialog.stack.length === 0,
+    priority: 2,
+    bindings: [
+      {
+        key: "up",
+        desc: "Select previous worker (return to prompt at top)",
+        group: "Workers",
+        cmd: () => selectPreviousBackgroundJobOrExit(),
+      },
+      {
+        key: "left",
+        desc: "Select previous worker (return to prompt at top)",
+        group: "Workers",
+        cmd: () => selectPreviousBackgroundJobOrExit(),
+      },
+      {
+        key: "down",
+        desc: "Select next worker",
+        group: "Workers",
+        cmd: () => moveSelectedBackgroundJob(1),
+      },
+      {
+        key: "right",
+        desc: "Select next worker",
+        group: "Workers",
+        cmd: () => moveSelectedBackgroundJob(1),
+      },
+      {
+        key: "return",
+        desc: "Open selected worker",
+        group: "Workers",
+        cmd: () => openSelectedBackgroundJob(),
+      },
+      {
+        key: "escape",
+        desc: "Close worker selector",
+        group: "Workers",
+        cmd: () => clearBackgroundJobsFocus(),
+      },
+    ],
   }))
 
   const revertInfo = createMemo(() => session()?.revert)
@@ -1516,13 +1614,7 @@ export function Session() {
                 <Show when={session()?.parentID}>
                   <SubagentFooter />
                 </Show>
-                <Show when={backgroundJobs().length > 0}>
-                  <BackgroundJobsFooter
-                    jobs={backgroundJobs()}
-                    now={backgroundNow()}
-                    onClick={showBackgroundJobsDialog}
-                  />
-                </Show>
+                <HmrRestartNotice />
                 <Show when={visible()}>
                   <pluginRuntime.Slot
                     name="session_prompt"
@@ -1540,8 +1632,25 @@ export function Session() {
                       onSubmit={() => {
                         toBottom()
                       }}
+                      onNavigateDown={focusBackgroundJobs}
                       sessionID={route.sessionID}
                       right={<pluginRuntime.Slot name="session_prompt_right" session_id={route.sessionID} />}
+                      below={
+                        <Show when={backgroundJobs().length > 0}>
+                          <BackgroundJobsFooter
+                            jobs={backgroundJobs()}
+                            now={backgroundNow()}
+                            focused={backgroundJobsFocused()}
+                            selectedID={selectedBackgroundJobID()}
+                            onClick={showBackgroundJobsDialog}
+                            onSelect={(id) => {
+                              setSelectedBackgroundJobID(id)
+                              setBackgroundJobsFocused(true)
+                              prompt?.blur()
+                            }}
+                          />
+                        </Show>
+                      }
                     />
                   </pluginRuntime.Slot>
                 </Show>
@@ -1572,6 +1681,21 @@ export function Session() {
         </box>
       </context.Provider>
     </LocationProvider>
+  )
+}
+
+function HmrRestartNotice() {
+  const { theme } = useTheme()
+  const restartRequired = useHmrRestartRequired()
+
+  return (
+    <Show when={restartRequired()}>
+      <box paddingLeft={3} paddingBottom={1}>
+        <text fg={theme.warning}>
+          Hot reload kept the previous UI. Use /restart to load the latest TUI changes.
+        </text>
+      </box>
+    </Show>
   )
 }
 

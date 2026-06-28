@@ -1,11 +1,11 @@
 import path from "path"
 import { abbreviateHome } from "../runtime"
-import { useLocation } from "./location"
+import { useOptionalLocation } from "./location"
 import { useTuiPaths } from "./runtime"
 
 export function usePathFormatter() {
   const paths = useTuiPaths()
-  const location = useLocation()
+  const location = useOptionalLocation()
   return {
     path: () => location()?.directory || paths.cwd,
     format: (input?: string) => formatPath(input, location()?.directory || paths.cwd, paths.home),

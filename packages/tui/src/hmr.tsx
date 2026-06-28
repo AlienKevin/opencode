@@ -7,6 +7,11 @@ type HotProps = Record<string, unknown>
 type HotComponent = Component<HotProps>
 type ComponentSignal = ReturnType<typeof createSignal<HotComponent>>
 
+type HotEntry = {
+  signal: ComponentSignal
+  previous: HotComponent
+}
+
 export type HmrRoot = {
   id: string
   file: string
@@ -20,7 +25,8 @@ export type HmrOptions = {
   debugLog?: (message: string) => void
 }
 
-const registry = new Map<string, ComponentSignal>()
+const registry = new Map<string, HotEntry>()
+const [restartRequired, setRestartRequired] = createSignal<{ id: string; error: string }>()
 const importPattern = /((?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'])(\.{1,2}\/[^"']+)(["'])/g
 const codeExtensions = new Set([".ts", ".tsx", ".js", ".jsx"])
 const moduleExtensions = ["", ".tsx", ".ts", ".jsx", ".js", ".json"]
@@ -57,17 +63,32 @@ function normalizeId(id: string) {
   }
 }
 
-function getEntry(id: string) {
+function emptyComponent() {
+  return undefined
+}
+
+function getEntry(id: string, initial: HotComponent = emptyComponent) {
   let entry = registry.get(id)
   if (!entry) {
-    entry = createSignal<HotComponent>(() => undefined)
+    entry = {
+      signal: createSignal<HotComponent>(initial),
+      previous: initial,
+    }
     registry.set(id, entry)
   }
   return entry
 }
 
+export function useHmrRestartRequired() {
+  return restartRequired
+}
+
+export function clearHmrRestartRequired() {
+  setRestartRequired(undefined)
+}
+
 export function registerComponent(id: string, component: HotComponent) {
-  const [, setComponent] = getEntry(normalizeId(id))
+  const [, setComponent] = getEntry(normalizeId(id), component).signal
   setComponent(() => component)
 }
 
@@ -75,8 +96,24 @@ export function hotComponent<P extends object>(id: string, component: Component<
   const normalized = normalizeId(id)
   registerComponent(normalized, component as unknown as HotComponent)
   return ((props: P) => {
-    const [component] = getEntry(normalized)
-    return createMemo(() => component()(props as unknown as HotProps))
+    const entry = getEntry(normalized)
+    const [component] = entry.signal
+    return createMemo(() => {
+      const current = component()
+      try {
+        const result = current(props as unknown as HotProps)
+        entry.previous = current
+        setRestartRequired(undefined)
+        return result
+      } catch (error) {
+        if (current === entry.previous) throw error
+        setRestartRequired({
+          id: normalized,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return entry.previous(props as unknown as HotProps)
+      }
+    })
   }) as unknown as Component<P>
 }
 

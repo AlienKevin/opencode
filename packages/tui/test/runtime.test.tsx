@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
 import { abbreviateHome } from "../src/runtime"
 import { TuiPathsProvider, useTuiPaths } from "../src/context/runtime"
+import { usePathFormatter } from "../src/context/path-format"
 
 test("abbreviates paths within home boundaries", () => {
   expect(abbreviateHome("/home/test", "/home/test")).toBe("~")
@@ -31,6 +32,29 @@ test("provides focused immutable runtime inputs", async () => {
     await app.renderOnce()
     expect(app.captureCharFrame()).toContain("/work")
     expect(Object.isFrozen(paths!)).toBe(true)
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
+test("formats paths relative to cwd without session provider", async () => {
+  function Runtime() {
+    const formatter = usePathFormatter()
+    return <text>{formatter.format("src/index.ts") + " " + formatter.format("/home/test/other/file")}</text>
+  }
+
+  const app = await testRender(
+    () => (
+      <TuiPathsProvider value={{ cwd: "/home/test/project", home: "/home/test", state: "/state", worktree: "/worktree" }}>
+        <Runtime />
+      </TuiPathsProvider>
+    ),
+    { width: 80, height: 3 },
+  )
+
+  try {
+    await app.renderOnce()
+    expect(app.captureCharFrame()).toContain("src/index.ts ~/other/file")
   } finally {
     app.renderer.destroy()
   }

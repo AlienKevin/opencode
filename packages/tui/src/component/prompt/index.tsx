@@ -62,6 +62,10 @@ export type PromptProps = {
   visible?: boolean
   disabled?: boolean
   onSubmit?: () => void
+  onNavigateDown?: () => boolean | void
+  // Rendered directly under the prompt input, above the status/hint line
+  // (esc interrupt · tokens · cost). Used for the background workers panel.
+  below?: JSX.Element
   ref?: (ref: PromptRef | undefined) => void
   hint?: JSX.Element
   right?: JSX.Element
@@ -991,8 +995,14 @@ export function Prompt(props: PromptProps) {
               return false
             }
 
+            // With an empty prompt there is no newer history to recall, so let a
+            // consumer (e.g. background workers focus) claim Down. history.move
+            // returns the live-draft `{ input: "", parts: [] }` here rather than
+            // undefined, so we must short-circuit before calling it.
+            if (input.plainText === "" && props.onNavigateDown?.() === true) return true
+
             const item = history.move(1, input.plainText)
-            if (!item) return false
+            if (!item) return props.onNavigateDown?.() === true
             input.setText(item.input)
             setStore("prompt", item)
             setStore("mode", item.mode ?? "normal")
@@ -1571,6 +1581,7 @@ export function Prompt(props: PromptProps) {
             }
           />
         </box>
+        {props.below}
         <box width="100%" flexDirection="row" justifyContent="space-between">
           <Switch>
             <Match when={restarting()}>

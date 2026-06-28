@@ -2,11 +2,18 @@ import { describe, expect, test } from "bun:test"
 import type { BackgroundJobListItem } from "@opencode-ai/sdk/v2"
 import {
   backgroundJobDetails,
-  formatBackgroundJobsFooterSummary,
+  backgroundJobGlyph,
+  defaultBackgroundJobID,
+  formatBackgroundJobsCounts,
   formatBackgroundJobDescription,
+  formatBackgroundJobMeta,
   formatBackgroundJobStatus,
   formatBackgroundJobTrace,
   formatBackgroundJobTitle,
+  nextBackgroundJobID,
+  orderedBackgroundJobs,
+  previousBackgroundJobOrExit,
+  selectedBackgroundJob,
 } from "../../../src/routes/session/background-jobs"
 
 describe("background jobs", () => {
@@ -46,7 +53,7 @@ describe("background jobs", () => {
     }
 
     expect(formatBackgroundJobDescription(job, 6_000)).toBe("running 5.0s")
-    expect(formatBackgroundJobsFooterSummary([job], 6_000)).toBe("1 running · bash: running 5.0s")
+    expect(formatBackgroundJobsCounts([job])).toBe("1 running")
   })
 
   test("uses explicit job title and includes tool metadata", () => {
@@ -94,6 +101,113 @@ describe("background jobs", () => {
     expect(formatBackgroundJobDescription(completed, 10_000)).toBe("task · completed 1.0s ago")
     expect(formatBackgroundJobDescription(failed, 10_000)).toBe("bash · failed 2.0s ago")
     expect(backgroundJobDetails(failed)).toEqual(["test failed"])
-    expect(formatBackgroundJobsFooterSummary([completed, failed], 10_000)).toBe("1 failed, 1 completed · Run tests: test failed")
+    // Counts-only summary stays stable regardless of worker output length.
+    expect(formatBackgroundJobsCounts([completed, failed])).toBe("1 failed, 1 completed")
+    // Compact right-aligned status column.
+    expect(formatBackgroundJobMeta(failed, 10_000)).toBe("failed")
+    expect(formatBackgroundJobMeta(completed, 10_000)).toBe("done")
+    expect(backgroundJobGlyph(failed)).toBe("✗")
+    expect(backgroundJobGlyph(completed)).toBe("✓")
+  })
+
+  test("running worker meta shows elapsed duration only", () => {
+    const running: BackgroundJobListItem = {
+      id: "session:tool:call_999",
+      type: "tool",
+      title: "Sleep",
+      status: "running",
+      severity: "info",
+      startedAt: 1_000,
+      tool: "bash",
+    }
+    expect(formatBackgroundJobMeta(running, 66_000)).toBe("1m 5s")
+    expect(backgroundJobGlyph(running)).toBe("•")
+  })
+
+  test("orders and cycles workers for footer navigation", () => {
+    const completed: BackgroundJobListItem = {
+      id: "completed",
+      type: "tool",
+      title: "Completed worker",
+      status: "completed",
+      severity: "success",
+      startedAt: 4_000,
+      completedAt: 5_000,
+    }
+    const running: BackgroundJobListItem = {
+      id: "running",
+      type: "tool",
+      title: "Running worker",
+      status: "running",
+      severity: "info",
+      startedAt: 3_000,
+    }
+    const failed: BackgroundJobListItem = {
+      id: "failed",
+      type: "tool",
+      title: "Failed worker",
+      status: "error",
+      severity: "error",
+      startedAt: 2_000,
+      completedAt: 6_000,
+    }
+
+    expect(orderedBackgroundJobs([completed, running, failed]).map((job) => job.id)).toEqual([
+      "failed",
+      "running",
+      "completed",
+    ])
+    expect(defaultBackgroundJobID([completed, running, failed])).toBe("failed")
+    expect(selectedBackgroundJob([completed, running, failed], "missing")?.id).toBe("failed")
+    expect(nextBackgroundJobID([completed, running, failed], "failed", 1)).toBe("running")
+    expect(nextBackgroundJobID([completed, running, failed], "failed", -1)).toBe("completed")
+  })
+
+  test("up at the top worker exits to the prompt, otherwise selects the previous worker", () => {
+    const completed: BackgroundJobListItem = {
+      id: "completed",
+      type: "tool",
+      title: "Completed worker",
+      status: "completed",
+      severity: "success",
+      startedAt: 4_000,
+      completedAt: 5_000,
+    }
+    const running: BackgroundJobListItem = {
+      id: "running",
+      type: "tool",
+      title: "Running worker",
+      status: "running",
+      severity: "info",
+      startedAt: 3_000,
+    }
+    const failed: BackgroundJobListItem = {
+      id: "failed",
+      type: "tool",
+      title: "Failed worker",
+      status: "error",
+      severity: "error",
+      startedAt: 2_000,
+      completedAt: 6_000,
+    }
+    // Order is: failed (top), running, completed (bottom).
+    const jobs = [completed, running, failed]
+
+    // At the top worker -> exit back to the prompt (no wrap to the bottom).
+    expect(previousBackgroundJobOrExit(jobs, "failed")).toEqual({ type: "exit" })
+
+    // Below the top -> move up one row.
+    expect(previousBackgroundJobOrExit(jobs, "running")).toEqual({ type: "select", id: "failed" })
+    expect(previousBackgroundJobOrExit(jobs, "completed")).toEqual({ type: "select", id: "running" })
+
+    // No / stale selection resolves to the top, so it exits.
+    expect(previousBackgroundJobOrExit(jobs, undefined)).toEqual({ type: "exit" })
+    expect(previousBackgroundJobOrExit(jobs, "missing")).toEqual({ type: "exit" })
+
+    // Single worker is always the top -> exit.
+    expect(previousBackgroundJobOrExit([running], "running")).toEqual({ type: "exit" })
+
+    // Empty list -> exit.
+    expect(previousBackgroundJobOrExit([], undefined)).toEqual({ type: "exit" })
   })
 })

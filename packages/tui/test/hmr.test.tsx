@@ -5,13 +5,14 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { Component, JSX } from "solid-js"
-import { hotComponent, registerComponent, reloadHotRoots } from "../src/hmr"
+import { clearHmrRestartRequired, hotComponent, registerComponent, reloadHotRoots, useHmrRestartRequired } from "../src/hmr"
 
 let app: Awaited<ReturnType<typeof testRender>> | undefined
 let tempDir: string | undefined
 
 afterEach(async () => {
   app?.renderer.destroy()
+  clearHmrRestartRequired()
   app = undefined
   if (tempDir) await rm(tempDir, { recursive: true, force: true })
   tempDir = undefined
@@ -87,6 +88,34 @@ test("reloadHotRoots keeps the previous UI when reload fails", async () => {
   await app.renderOnce()
 
   expect(app.captureCharFrame()).toContain("missing:before")
+})
+
+test("hot component keeps previous UI and asks for restart when render fails", async () => {
+  const id = "fixture-render-fail#AppView"
+  const HotAppView = hotComponent(id, () => <text>before</text>)
+
+  function Notice() {
+    const restartRequired = useHmrRestartRequired()
+    return <text>{restartRequired() ? "Use /restart" : ""}</text>
+  }
+
+  app = await testRender(
+    () => (
+      <box flexDirection="column">
+        <HotAppView />
+        <Notice />
+      </box>
+    ),
+    { width: 40, height: 4 },
+  )
+  await app.renderOnce()
+  expect(app.captureCharFrame()).toContain("before")
+
+  registerComponent(id, () => { throw new Error("render failed") })
+  await app.renderOnce()
+
+  expect(app.captureCharFrame()).toContain("before")
+  expect(app.captureCharFrame()).toContain("Use /restart")
 })
 
 async function createFixture(label: string) {
